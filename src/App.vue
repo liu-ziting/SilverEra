@@ -33,13 +33,15 @@ const taels = computed(() => {
 })
 
 // 根据朝代计算具体的银两
-const calculateDynastyTaels = (dynastyKey: string) => {
+const calculateDynastyTaels = (dynastyKey: string, isAnnual: boolean = false) => {
     if (!salary.value || !silverPrice.value) return '0.00'
     // 匹配朝代关键字
     const key = Object.keys(dynastyStandards).find(k => dynastyKey.includes(k)) || '清'
     const weight = dynastyStandards[key]
     const pricePerTael = silverPrice.value * weight
-    return (salary.value / pricePerTael).toFixed(2)
+    const monthlySalary = salary.value
+    const amount = isAnnual ? monthlySalary * 12 : monthlySalary
+    return (amount / pricePerTael).toFixed(2)
 }
 
 // AI 结果结构化
@@ -87,22 +89,19 @@ const askAI = async () => {
     loadingAI.value = true
     aiResults.value = []
 
+    const monthlyTaels = calculateDynastyTaels(selectedDynasty.value)
+    const annualTaels = calculateDynastyTaels(selectedDynasty.value, true)
+
     const messages: ChatMessage[] = [
         {
             role: 'system',
-            content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两） and 目标朝代（用户将明确指定），分析其在该朝代的社会地位。
+            content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两）以及年薪总计（两），结合目标朝代的度量衡和经济背景，分析其在该朝代的社会地位。
 
-重要注意事项：不同朝代的银两价值、度量衡标准、物价水平和社会结构差异极大。你的分析必须基于可靠的历史经济数据，避免现代偏见，并考虑该朝代的具体背景（如通货膨胀、区域差异等）。
-
-【核心要求】
-1. 目标朝代：${selectedDynasty.value}朝。请严格以此朝代为基础进行分析。
-2. 职业多样化匹配：根据月俸水平，从“士农工商”及其他社会阶层（如军户、匠籍等）中匹配最贴切的身份。不要局限于官吏系统。收入分类应基于该朝代的典型收入范围（例如，低收入可能为月俸1-5两，中等收入5-50两，高收入50两以上，但需根据朝代调整），并参考以下方向：
-   - 若收入极高：考虑顶级富商（如盐商、外贸商）、高级文官或武将、皇亲国戚、大型庄园主。
-   - 若收入中等：考虑中小商人、专业匠师（如官窑匠人）、书院教习、地方小吏或中层军官。
-   - 若收入较低：考虑农民、劳工、小贩、仆役或士兵。
-3. 职业细化：提供具体的、有该朝代特征的身份名称。例如，在清朝，高收入者可能是“广州十三行丝绸商”，而非泛泛的“商人”；在宋朝，中等收入者可能是“汴京脚店店主”。
-4. 细分标签：为该身份提供3-4个细分标签（tags），描述其社会属性、行业、经济状况或生活状态。
-5. 真实物价分析：结合该朝代真实的购买力，提供职业和生活分析。务必提供具体的【物价参考】，如一石米、一匹布 or 一日工食的价格（以白银两为单位），并尽可能引用该朝代的常见数据 or 历史记载（如《中国货币史》等）。如果数据不确定，请注明估算来源。
+重要注意事项：
+1. 严禁混淆【月俸】与【年俸】：历史文献（如《大清会典》、《宋史·职官志》）中的官吏俸禄通常以“年”为单位。如果用户月入10两，年入则为120两。请务必将用户的年薪与历史上的年俸数据进行比对，而非直接用月薪比对年俸。
+2. 目标朝代：${selectedDynasty.value}朝。请严格以此朝代为基础进行分析。
+3. 职业多样化匹配：根据收入水平，从“士农工商”及其他社会阶层（如军户、匠籍等）中匹配最贴切的身份。
+4. 真实物价分析：结合该朝代真实的购买力，提供职业和生活分析。务必提供具体的【物价参考】，如一石米、一匹布的价格（以白银两为单位）。
 
 你的响应必须直接返回JSON格式数据，不要有任何开场白、解释或额外文本。
 JSON 结构必须如下：
@@ -112,14 +111,16 @@ JSON 结构必须如下：
   "tags": ["标签1", "标签2", "标签3"],
   "level": "生活水平描述（如'赤贫'、'温饱'、'小康'、'富裕'、'豪奢'）",
   "price_ref": "具体物价参考（例如'一石米约值白银0.5两，据《梦溪笔谈》记载'）",
-  "desc": "基于该职业的社会地位、月俸和物价的分析描述（包括在阶层中的位置、生活状况等）",
-  "suggest": "生存锦囊（针对该生活水平的实用建议，如储蓄、投资或规避风险）"
+  "desc": "基于该职业的社会地位、月俸、年俸和物价的分析描述（请明确提到年收入在当时的水平）",
+  "suggest": "生存锦囊"
 }`
         },
         {
             role: 'user',
-            content: `余月俸 ${salary.value} 文。
-按${selectedDynasty.value}代度量衡折算约为：${calculateDynastyTaels(selectedDynasty.value)} 两。
+            content: `余月俸 ${salary.value} 元（现代货币）。
+按${selectedDynasty.value}代度量衡折算：
+- 月入约：${monthlyTaels} 两
+- 年入约：${annualTaels} 两
 请据此批阅。`
         }
     ]
