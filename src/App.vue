@@ -62,6 +62,16 @@ const loadingAI = ref(false)
 const selectedDynasty = ref('清') // 默认选择清朝
 const showAnnual = ref(false)
 
+// 图片弹窗状态
+const showImageModal = ref(false)
+const modalImageUrl = ref('')
+
+const viewLargeImage = (url: string) => {
+    if (!url) return
+    modalImageUrl.value = url
+    showImageModal.value = true
+}
+
 // 解析 AI 返回的内容
 const parseAIResponse = (content: string): AIAnalysis | null => {
     try {
@@ -227,14 +237,14 @@ onMounted(() => {})
                             <label>月薪收入 (CNY)</label>
                             <div class="input-wrapper">
                                 <input type="number" v-model="salary" placeholder="请输入您的月薪..." />
-                                <span class="unit">¥</span>
+                                <span class="input-unit">¥</span>
                             </div>
                         </div>
                         <div class="input-group">
                             <label>今日银价 (CNY/克)</label>
                             <div class="input-wrapper">
                                 <input type="number" v-model="silverPrice" placeholder="当前市场金价..." />
-                                <span class="unit">¥/g</span>
+                                <span class="input-unit">¥/g</span>
                             </div>
                         </div>
                     </div>
@@ -306,14 +316,21 @@ onMounted(() => {})
                 </div>
                 <div class="window-body ai-content">
                     <div v-for="(item, index) in aiResults" :key="index" class="ai-item">
+                        <!-- 背景装饰 -->
+                        <div class="ai-bg-decoration"></div>
+
                         <div class="ai-header-row">
                             <div class="ai-main-info">
                                 <div class="ai-dynasty-header">
-                                    <span class="ai-tag-dynasty"># {{ item.dynasty }}</span>
-                                    <span class="ai-level">{{ item.level }}</span>
+                                    <span class="ai-tag-dynasty">{{ item.dynasty }}</span>
+                                    <div class="ai-level-seal" :class="'level-' + item.level">
+                                        {{ item.level }}
+                                    </div>
                                 </div>
-                                <div class="ai-taels">
-                                    折算：月入 {{ calculateDynastyTaels(item.dynasty) }} 两<span v-if="showAnnual"> · 年入 {{ calculateDynastyTaels(item.dynasty, true) }} 两</span>
+                                <div class="ai-taels-badge">
+                                    <span class="label">月入折合</span>
+                                    <span class="value">{{ calculateDynastyTaels(item.dynasty) }}</span>
+                                    <span class="unit">两白银</span>
                                 </div>
                                 <h3 class="ai-title">{{ item.title }}</h3>
                                 <!-- 细分职业标签 -->
@@ -322,28 +339,46 @@ onMounted(() => {})
                                 </div>
                             </div>
 
-                            <!-- 职业照头像 -->
-                            <div v-if="item.loadingImage || item.imageUrl" class="ai-avatar-wrapper">
-                                <div v-if="item.loadingImage" class="avatar-loader">
-                                    <span class="loader"></span>
-                                    <span class="loader-text">画像中...</span>
+                            <!-- 职业照头像 - 古风相框 -->
+                            <div v-if="item.loadingImage || item.imageUrl" class="ai-avatar-frame">
+                                <div class="frame-inner">
+                                    <div v-if="item.loadingImage" class="avatar-loader">
+                                        <div class="brush-loader"></div>
+                                        <span class="loader-text">丹青描绘中...</span>
+                                    </div>
+                                    <img v-else :src="item.imageUrl" alt="职业照" class="ai-avatar" @click="viewLargeImage(item.imageUrl)" title="点击查看大图" />
                                 </div>
-                                <img v-else :src="item.imageUrl" alt="职业照" class="ai-avatar" />
+                                <div class="frame-decoration"></div>
                             </div>
                         </div>
 
+                        <div class="ai-divider"></div>
+
                         <p class="ai-desc">{{ item.desc }}</p>
-                        <div class="ai-price-ref">
-                            <span class="price-label">当年物价参考：</span>
-                            {{ item.price_ref }}
-                        </div>
-                        <div class="ai-suggest">
-                            <span class="suggest-label">建议：</span>
-                            {{ item.suggest }}
+
+                        <div class="ai-info-grid">
+                            <div class="ai-info-card price-card">
+                                <div class="card-title"><span class="icon">📜</span> 当年物价参考</div>
+                                <div class="card-content">{{ item.price_ref }}</div>
+                            </div>
+                            <div class="ai-info-card suggest-card">
+                                <div class="card-title"><span class="icon">💡</span> 生存锦囊</div>
+                                <div class="card-content">{{ item.suggest }}</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- 图片查看弹窗 -->
+            <Transition name="fade">
+                <div v-if="showImageModal" class="image-modal-overlay" @click="showImageModal = false">
+                    <div class="image-modal-content" @click.stop>
+                        <button class="modal-close" @click="showImageModal = false">&times;</button>
+                        <img :src="modalImageUrl" alt="大图" class="modal-image" />
+                    </div>
+                </div>
+            </Transition>
         </main>
 
         <footer class="app-footer">
@@ -363,6 +398,8 @@ onMounted(() => {})
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
 /* 全局变量与背景 */
 :global(body) {
     background-color: #f8f9fa;
@@ -529,6 +566,7 @@ onMounted(() => {})
 .accent-arrow {
     color: #e67e22;
     margin-right: 8px;
+    font-family: 'Ma Shan Zheng', 'Kaiti', 'STKaiti', serif;
 }
 
 .highlight {
@@ -641,7 +679,7 @@ onMounted(() => {})
     -moz-appearance: textfield;
 }
 
-.unit {
+.input-unit {
     position: absolute;
     right: 16px;
     color: #95a5a6;
@@ -821,85 +859,278 @@ onMounted(() => {})
 }
 
 .ai-item {
-    padding: 24px;
+    padding: 32px 15px;
     border-bottom: 1px solid #f0f0f0;
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 10px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.ai-bg-decoration {
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(230, 126, 34, 0.03) 0%, transparent 70%);
+    pointer-events: none;
 }
 
 .ai-header-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 20px;
+    gap: 40px;
+    z-index: 1;
+    position: relative;
 }
 
 .ai-main-info {
     flex: 1;
+    min-width: 0; /* 防止 flex 子项溢出 */
 }
 
-.ai-avatar-wrapper {
+.ai-dynasty-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.ai-tag-dynasty {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #e67e22;
+    background: rgba(230, 126, 34, 0.08);
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-family: 'PingFang SC', serif;
+}
+
+/* 印章风格的状态标签 */
+.ai-level-seal {
+    font-family: 'Ma Shan Zheng', cursive, serif;
+    font-size: 0.85rem;
+    border: 2px solid #d35400;
+    color: #d35400;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transform: rotate(-5deg);
+    font-weight: bold;
+    box-shadow: 1px 1px 0 rgba(211, 84, 0, 0.2);
+    display: inline-block;
+}
+
+.ai-taels-badge {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: nowrap; /* 禁止换行 */
+    gap: 8px;
+    margin-bottom: 16px;
+    color: #95a5a6;
+    font-size: 0.85rem;
+    white-space: nowrap; /* 确保文字不被挤压换行 */
+}
+
+.ai-taels-badge .value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #2c3e50;
+    font-family: 'Fira Code', monospace;
+    line-height: 1;
+}
+
+.ai-taels-badge .unit {
+    color: #7f8c8d;
+}
+
+.ai-title {
+    margin: 0 0 16px;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #2c3e50;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+/* 古风相框 */
+.ai-avatar-frame {
+    position: relative;
+    width: 140px;
+    height: 140px;
     flex-shrink: 0;
-    width: 100px;
-    height: 100px;
-    border-radius: 12px;
+    padding: 8px;
+    background: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    margin-right: 10px; /* 为旋转留出空间 */
+    margin-top: 5px;
+}
+
+.ai-avatar-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    pointer-events: none;
+    transform: rotate(2deg);
+    z-index: -1;
+    background: #fff;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.frame-inner {
+    width: 100%;
+    height: 100%;
     overflow: hidden;
+    border-radius: 2px;
     background: #f8f9fa;
-    border: 1px solid #eee;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transform: rotate(2deg); /* 仅旋转内部和边框，不影响整体布局 */
 }
 
 .ai-avatar {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    animation: fadeIn 0.5s ease-out;
+    filter: sepia(0.1) contrast(1.1);
 }
 
 .avatar-loader {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
-.loader-text {
-    font-size: 0.7rem;
-    color: #95a5a6;
+.brush-loader {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(230, 126, 34, 0.1);
+    border-top: 3px solid #e67e22;
+    border-radius: 50%;
+    animation: spin 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+}
+
+.ai-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.05) 15%, rgba(0, 0, 0, 0.05) 85%, transparent);
+    margin: 8px 0;
 }
 
 .ai-desc {
     color: #34495e;
-    font-size: 0.95rem;
-    line-height: 1.6;
-    margin: 4px 0;
+    font-size: 1rem;
+    line-height: 1.8;
+    margin: 0;
+    text-align: justify;
 }
 
-.ai-price-ref {
+.ai-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 12px;
+}
+
+.ai-info-card {
+    background: #fcfcfc;
+    border: 1px solid #f0f0f0;
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.3s ease;
+}
+
+.ai-info-card:hover {
+    background: #fff;
+    border-color: #e67e22;
+    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.05);
+}
+
+.card-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #e67e22;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.card-content {
     font-size: 0.85rem;
     color: #7f8c8d;
-    background: #fcfcfc;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border-left: 2px solid #eee;
+    line-height: 1.6;
 }
 
-.ai-suggest {
-    font-size: 0.9rem;
-    color: #7f8c8d;
-    font-style: italic;
+.suggest-card {
+    background: rgba(39, 201, 63, 0.02);
 }
 
-@keyframes fadeIn {
+.suggest-card .card-title {
+    color: #27c93f;
+}
+
+/* 图片查看弹窗样式 */
+.image-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    cursor: zoom-out;
+}
+
+.image-modal-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    cursor: default;
+    animation: zoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-image {
+    display: block;
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 8px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    border: 4px solid #fff;
+}
+
+.modal-close {
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 2.5rem;
+    cursor: pointer;
+    transition: transform 0.3s;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    transform: scale(1.2) rotate(90deg);
+}
+
+/* 动画 */
+@keyframes zoomIn {
     from {
         opacity: 0;
-        transform: scale(0.95);
+        transform: scale(0.8);
     }
     to {
         opacity: 1;
@@ -907,7 +1138,61 @@ onMounted(() => {})
     }
 }
 
-.ai-dynasty-header {
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.ai-avatar {
+    cursor: zoom-in;
+}
+
+@media (max-width: 768px) {
+    .modal-close {
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .ai-header-row {
+        flex-direction: column-reverse;
+        gap: 24px;
+    }
+
+    .ai-avatar-frame {
+        width: 100px;
+        height: 100px;
+        align-self: center;
+    }
+
+    .ai-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ai-title {
+        font-size: 1.5rem;
+    }
+}
+
+.ai-job-tags {
     display: flex;
     align-items: center;
     gap: 12px;

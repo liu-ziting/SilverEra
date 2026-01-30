@@ -4,7 +4,8 @@
   font-weight: 400;
 
   color-scheme: light;
-  background-color: #f4f1de; /* 浅米色，类似宣纸 */
+  background-color: #f4f1de;
+  /* 浅米色，类似宣纸 */
   color: #2b2d42;
 
   font-synthesis: none;
@@ -18,7 +19,8 @@ body {
   min-height: 100vh;
   /* 宣纸质感背景 */
   background-color: #f4f1de;
-  background-image: url("https://www.transparenttextures.com/patterns/p6.png"); /* 细微纤维质感 */
+  background-image: url("https://www.transparenttextures.com/patterns/p6.png");
+  /* 细微纤维质感 */
   position: relative;
 }
 
@@ -29,7 +31,7 @@ body::before {
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.05) 100%);
+  background: radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.05) 100%);
   pointer-events: none;
 }
 
@@ -41,8 +43,10 @@ body::before {
   box-sizing: border-box;
 }
 
-h1, h2, h3 {
-  font-family: "Ma Shan Zheng", "Kaiti", "STKaiti", serif; /* 楷体或书法体 */
+h1,
+h2,
+h3 {
+  /* font-family: "Ma Shan Zheng", "Kaiti", "STKaiti", serif; */
   letter-spacing: 0.1em;
 }
 
