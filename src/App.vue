@@ -154,10 +154,28 @@ onMounted(() => {})
         <!-- 顶部导航栏 -->
         <header class="navbar">
             <div class="nav-left">
+                <div class="logo-wrapper">
+                    <svg
+                        viewBox="0 0 24 24"
+                        width="24"
+                        height="24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="logo-icon"
+                    >
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                    </svg>
+                </div>
                 <span class="nav-brand">银色春秋.AI</span>
             </div>
             <div class="nav-right">
-                <button class="btn-primary">立即开始</button>
+                <div class="model-credit">
+                    <span class="pulse-dot"></span>
+                    由大模型 <span class="model-name">MiMo-V2-Flash</span> 驱动
+                </div>
             </div>
         </header>
 
@@ -285,6 +303,16 @@ onMounted(() => {})
 
         <footer class="app-footer">
             <p>© 2026 银色春秋项目. All rights reserved.</p>
+            <p class="footer-author">
+                <a href="https://github.com/liu-ziting/SilverEra" target="_blank" rel="noopener noreferrer" class="github-link">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" class="github-icon">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                        />
+                    </svg>
+                    by:liuziting
+                </a>
+            </p>
         </footer>
     </div>
 </template>
@@ -292,9 +320,9 @@ onMounted(() => {})
 <style scoped>
 /* 全局变量与背景 */
 :global(body) {
-    background-color: #0a0a0a;
-    background-image: linear-gradient(rgba(255, 107, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 107, 0, 0.05) 1px, transparent 1px);
-    background-size: 30px 30px;
+    background-color: #f8f9fa;
+    background-image: linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
     margin: 0;
     font-family:
         'Inter',
@@ -303,7 +331,7 @@ onMounted(() => {})
         'PingFang SC',
         'Microsoft YaHei',
         sans-serif;
-    color: #e0e0e0;
+    color: #2c3e50;
 }
 
 .app-container {
@@ -318,14 +346,72 @@ onMounted(() => {})
     justify-content: space-between;
     align-items: center;
     padding: 24px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .nav-brand {
     font-size: 1.2rem;
     font-weight: 800;
-    color: #ff6b00;
-    margin-right: 40px;
+    color: #e67e22;
+}
+
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(230, 126, 34, 0.1);
+    border-radius: 10px;
+    color: #e67e22;
+}
+
+.nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.model-credit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    background: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid #eee;
+}
+
+.model-name {
+    color: #2c3e50;
+    font-weight: 700;
+    font-family: 'Fira Code', monospace;
+}
+
+.pulse-dot {
+    width: 6px;
+    height: 6px;
+    background: #27c93f;
+    border-radius: 50%;
+    box-shadow: 0 0 0 rgba(39, 201, 63, 0.4);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(39, 201, 63, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 10px rgba(39, 201, 63, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(39, 201, 63, 0);
+    }
 }
 
 .nav-links {
@@ -346,7 +432,7 @@ onMounted(() => {})
 }
 
 .btn-primary {
-    background: #ff6b00;
+    background: #e67e22;
     color: #fff;
     border: none;
     padding: 8px 20px;
@@ -359,7 +445,7 @@ onMounted(() => {})
 }
 
 .btn-primary:hover {
-    background: #ff8533;
+    background: #d35400;
     transform: translateY(-1px);
 }
 
@@ -373,14 +459,14 @@ onMounted(() => {})
     align-items: center;
     gap: 8px;
     font-size: 0.8rem;
-    color: #ff6b00;
+    color: #e67e22;
     margin-bottom: 16px;
 }
 
 .dot {
     width: 6px;
     height: 6px;
-    background: #ff6b00;
+    background: #e67e22;
     border-radius: 50%;
 }
 
@@ -388,40 +474,40 @@ onMounted(() => {})
     font-size: 2.5rem;
     font-weight: 800;
     margin: 0 0 16px;
-    color: #fff;
+    color: #2c3e50;
 }
 
 .accent-arrow {
-    color: #ff6b00;
+    color: #e67e22;
     margin-right: 8px;
 }
 
 .highlight {
-    color: #ff6b00;
+    color: #e67e22;
 }
 
 .hero-desc {
-    color: #666;
+    color: #7f8c8d;
     font-family: 'Fira Code', monospace;
     font-size: 0.95rem;
 }
 
 /* 窗口容器风格 */
 .window-container {
-    background: #141414;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: 12px;
     overflow: hidden;
     margin-bottom: 30px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
 }
 
 .window-header {
-    background: #1a1a1a;
+    background: #fcfcfc;
     padding: 12px 16px;
     display: flex;
     align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .window-controls {
@@ -448,7 +534,7 @@ onMounted(() => {})
 
 .window-title {
     font-size: 0.75rem;
-    color: #666;
+    color: #95a5a6;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -467,7 +553,7 @@ onMounted(() => {})
 .input-group label {
     display: block;
     font-size: 0.85rem;
-    color: #999;
+    color: #7f8c8d;
     margin-bottom: 8px;
 }
 
@@ -479,18 +565,20 @@ onMounted(() => {})
 
 .input-wrapper input {
     width: 100%;
-    background: #1f1f1f;
-    border: 1px solid #333;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
     border-radius: 6px;
     padding: 12px 16px;
-    color: #fff;
+    color: #2c3e50;
     font-size: 1rem;
-    transition: border-color 0.3s;
+    transition: all 0.3s;
 }
 
 .input-wrapper input:focus {
     outline: none;
-    border-color: #ff6b00;
+    border-color: #e67e22;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.1);
 }
 
 /* 移除数字输入框控制按钮 */
@@ -507,7 +595,7 @@ onMounted(() => {})
 .unit {
     position: absolute;
     right: 16px;
-    color: #666;
+    color: #95a5a6;
     font-size: 0.9rem;
 }
 
@@ -520,8 +608,8 @@ onMounted(() => {})
 }
 
 .dynasty-card {
-    background: #1f1f1f;
-    border: 1px solid #333;
+    background: #ffffff;
+    border: 1px solid #eee;
     border-radius: 8px;
     padding: 16px;
     position: relative;
@@ -531,22 +619,22 @@ onMounted(() => {})
 
 .dynasty-card:hover {
     transform: translateY(-4px);
-    border-color: rgba(255, 107, 0, 0.5);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    border-color: rgba(230, 126, 34, 0.3);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
 
 .dynasty-card.active {
-    border-color: #ff6b00;
-    background: rgba(255, 107, 0, 0.05);
-    box-shadow: 0 0 20px rgba(255, 107, 0, 0.15);
+    border-color: #e67e22;
+    background: rgba(230, 126, 34, 0.02);
+    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.08);
 }
 
 .select-indicator {
     position: absolute;
     top: -1px;
     right: -1px;
-    background: #ff6b00;
-    color: #000;
+    background: #e67e22;
+    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -570,7 +658,7 @@ onMounted(() => {})
 .selection-hint {
     font-family: 'Fira Code', monospace;
     font-size: 0.8rem;
-    color: #444;
+    color: #bdc3c7;
     margin-bottom: 20px;
     padding-left: 4px;
 }
@@ -583,13 +671,13 @@ onMounted(() => {})
 
 .dynasty-tag {
     font-size: 0.75rem;
-    color: #ff6b00;
+    color: #e67e22;
     font-weight: 600;
 }
 
 .weight-info {
     font-size: 0.7rem;
-    color: #666;
+    color: #95a5a6;
 }
 
 .card-value {
@@ -599,18 +687,18 @@ onMounted(() => {})
 .amount {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #fff;
+    color: #2c3e50;
     margin-right: 4px;
 }
 
 .currency {
     font-size: 0.8rem;
-    color: #999;
+    color: #95a5a6;
 }
 
 .card-footer {
     font-size: 0.75rem;
-    color: #666;
+    color: #bdc3c7;
 }
 
 /* AI 按钮 */
@@ -619,7 +707,7 @@ onMounted(() => {})
 }
 
 .btn-ai {
-    background: #ff6b00;
+    background: #e67e22;
     color: #fff;
     border: none;
     padding: 14px 40px;
@@ -628,17 +716,18 @@ onMounted(() => {})
     font-weight: 700;
     cursor: pointer;
     transition: all 0.3s;
-    box-shadow: 0 10px 20px rgba(255, 107, 0, 0.2);
+    box-shadow: 0 8px 20px rgba(230, 126, 34, 0.15);
 }
 
 .btn-ai:hover:not(:disabled) {
-    background: #ff8533;
+    background: #d35400;
     transform: scale(1.02);
-    box-shadow: 0 12px 24px rgba(255, 107, 0, 0.3);
+    box-shadow: 0 10px 25px rgba(230, 126, 34, 0.25);
 }
 
 .btn-ai:disabled {
-    background: #333;
+    background: #ecf0f1;
+    color: #bdc3c7;
     cursor: not-allowed;
     box-shadow: none;
 }
@@ -650,7 +739,7 @@ onMounted(() => {})
 }
 
 .ai-item {
-    border-left: 2px solid #ff6b00;
+    border-left: 2px solid #e67e22;
     padding-left: 20px;
 }
 
@@ -662,14 +751,14 @@ onMounted(() => {})
 }
 
 .ai-tag-dynasty {
-    color: #ff6b00;
+    color: #e67e22;
     font-weight: 700;
 }
 
 .ai-level {
     font-size: 0.8rem;
-    background: rgba(255, 107, 0, 0.1);
-    color: #ff6b00;
+    background: rgba(230, 126, 34, 0.1);
+    color: #e67e22;
     padding: 2px 8px;
     border-radius: 4px;
 }
@@ -677,7 +766,7 @@ onMounted(() => {})
 .ai-title {
     margin: 0 0 12px;
     font-size: 1.2rem;
-    color: #fff;
+    color: #2c3e50;
 }
 
 .ai-job-tags {
@@ -689,21 +778,22 @@ onMounted(() => {})
 
 .job-tag {
     font-size: 0.75rem;
-    background: #1f1f1f;
-    border: 1px solid #333;
-    color: #aaa;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    color: #7f8c8d;
     padding: 2px 10px;
     border-radius: 4px;
     transition: all 0.2s;
 }
 
 .job-tag:hover {
-    border-color: #ff6b00;
-    color: #ff6b00;
+    border-color: #e67e22;
+    color: #e67e22;
+    background: #fff;
 }
 
 .ai-desc {
-    color: #999;
+    color: #34495e;
     font-size: 0.95rem;
     line-height: 1.6;
     margin-bottom: 16px;
@@ -711,27 +801,27 @@ onMounted(() => {})
 
 .ai-price-ref {
     font-size: 0.85rem;
-    color: #888;
-    background: rgba(255, 255, 255, 0.03);
+    color: #7f8c8d;
+    background: #fcfcfc;
     padding: 8px 12px;
     border-radius: 6px;
     margin-bottom: 16px;
-    border-left: 2px solid #333;
+    border-left: 2px solid #eee;
 }
 
 .price-label {
-    color: #ff6b00;
+    color: #e67e22;
     font-weight: 600;
 }
 
 .ai-suggest {
     font-size: 0.9rem;
-    color: #aaa;
+    color: #7f8c8d;
     font-style: italic;
 }
 
 .suggest-label {
-    color: #ff6b00;
+    color: #e67e22;
     font-weight: 600;
     font-style: normal;
 }
@@ -740,8 +830,29 @@ onMounted(() => {})
 .app-footer {
     text-align: center;
     padding: 40px 0;
-    color: #444;
+    color: #bdc3c7;
     font-size: 0.8rem;
+}
+
+.footer-author {
+    margin-top: 8px;
+}
+
+.github-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #95a5a6;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.github-link:hover {
+    color: #e67e22;
+}
+
+.github-icon {
+    opacity: 0.8;
 }
 
 /* 响应式适配 */

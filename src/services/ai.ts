@@ -9,7 +9,7 @@ export interface ChatMessage {
 export const aiService = {
     // 文本生成 (通过 Worker 转发)
     async chat(messages: ChatMessage[]) {
-        const response = await fetch(WORKER_URL + '/api/xiaomi-ai', {
+        const response = await fetch(WORKER_URL + '/api/ai-chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
