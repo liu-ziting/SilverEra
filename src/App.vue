@@ -217,8 +217,8 @@ onMounted(() => {})
                     <span class="dot"></span>
                     <span>工资银两换算器 / 银色春秋</span>
                 </div>
-                <h1 class="hero-title"><span class="accent-arrow">→</span> 穿越千年的<span class="highlight">购买力</span>对标</h1>
-                <p class="hero-desc">// 通过现代工资与历代银价权重，精准还原你在古代的社会阶层</p>
+                <h1 class="hero-title"><span class="accent-arrow">→</span> 看你的月薪在古代值<span class="highlight">几两银子</span>？</h1>
+                <p class="hero-desc">// 穿越时空的购买力对标，精准还原你在古代的社会阶层</p>
             </section>
 
             <!-- 输入区域容器 -->
