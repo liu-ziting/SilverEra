@@ -1,119 +1,153 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import axios from 'axios'
+import { ref, onMounted, computed, watch } from 'vue'
 import { zhipuApi, ChatMessage } from './zhipu'
 
 // 银价数据
-const silverPrice = ref<number>(0)
-const loadingPrice = ref(false)
-const silverType = ref('Ag(T+D)')
-const isMock = ref(false)
+const silverPrice = ref<number>(Number(localStorage.getItem('silverPrice')) || 25)
+const silverType = ref('官定纹银')
 
 // 用户输入
-const salary = ref<number | null>(null)
+const salary = ref<number | null>(Number(localStorage.getItem('userSalary')) || null)
+
+// 监听并缓存
+watch(silverPrice, newVal => {
+    if (newVal) localStorage.setItem('silverPrice', newVal.toString())
+})
+
+watch(salary, newVal => {
+    if (newVal) localStorage.setItem('userSalary', newVal.toString())
+})
+const dynastyStandards: Record<string, number> = {
+    汉: 15.6,
+    唐: 41.3,
+    宋: 40.0,
+    明: 37.3,
+    清: 37.3
+}
+
+// 基础换算：现代市两（50g）作为默认展示参考
 const taels = computed(() => {
     if (!salary.value || !silverPrice.value) return '0.00'
-    const pricePerGram = silverPrice.value / 1000
-    const pricePerTael = pricePerGram * 50
+    const pricePerTael = silverPrice.value * 50
     return (salary.value / pricePerTael).toFixed(2)
 })
 
+// 根据朝代计算具体的银两
+const calculateDynastyTaels = (dynastyKey: string) => {
+    if (!salary.value || !silverPrice.value) return '0.00'
+    // 匹配朝代关键字
+    const key = Object.keys(dynastyStandards).find(k => dynastyKey.includes(k)) || '清'
+    const weight = dynastyStandards[key]
+    const pricePerTael = silverPrice.value * weight
+    return (salary.value / pricePerTael).toFixed(2)
+}
+
 // AI 结果结构化
 interface AIAnalysis {
+    dynasty: string
     title: string
     level: string
+    price_ref: string // 新增：当年物价参考
     desc: string
     suggest: string
 }
 
-const aiAnalysis = ref<AIAnalysis | null>(null)
+const aiResults = ref<AIAnalysis[]>([])
 const loadingAI = ref(false)
 
-// 解析 AI 返回的内容
-const parseAIResponse = (content: string): AIAnalysis => {
-    const getTagContent = (tag: string) => {
-        const regex = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`)
-        const match = content.match(regex)
-        return match ? match[1].trim() : ''
-    }
-
-    return {
-        title: getTagContent('title') || '无名布衣',
-        level: getTagContent('level') || '尚可',
-        desc: getTagContent('desc') || content,
-        suggest: getTagContent('suggest') || '平安即是福。'
-    }
-}
-
-// 获取银价
-const fetchSilverPrice = async () => {
-    loadingPrice.value = true
-    isMock.value = false
+// 解析 AI 返回的内容 (支持多个朝代 JSON 格式)
+const parseAIResponse = (content: string): AIAnalysis[] => {
     try {
-        const APP_KEY = '6e8647796d10884d'
-        const response = await axios.get(`https://api.jisuapi.com/silver/shgold?appkey=${APP_KEY}`)
+        // 提取 JSON 字符串（处理可能存在的 markdown 代码块）
+        const jsonMatch = content.match(/\{[\s\S]*\}/)
+        const jsonStr = jsonMatch ? jsonMatch[0] : content
+        const data = JSON.parse(jsonStr)
 
-        if (response.data && response.data.status === '0' && response.data.result) {
-            const agtd = response.data.result.find((item: any) => item.type === 'Ag(T+D)')
-            if (agtd) {
-                silverPrice.value = parseFloat(agtd.price)
-                silverType.value = '今日纹银'
+        // 兼容不同的返回格式（数组或对象）
+        if (Array.isArray(data)) return data
+        if (data.results) return data.results
+        if (data.data) return data.data
+
+        // 如果是按朝代作为 key 的对象
+        const dynasties = ['汉', '唐', '宋', '明', '清']
+        const results: AIAnalysis[] = []
+        dynasties.forEach(d => {
+            const key = Object.keys(data).find(k => k.includes(d))
+            if (key && data[key]) {
+                results.push({
+                    dynasty: data[key].dynasty || `${d}朝`,
+                    title: data[key].title || '',
+                    level: data[key].level || '',
+                    price_ref: data[key].price_ref || '',
+                    desc: data[key].desc || '',
+                    suggest: data[key].suggest || ''
+                })
             }
-        } else {
-            throw new Error('API Error')
-        }
-    } catch (error) {
-        console.warn('获取银价失败，使用模拟数据', error)
-        silverPrice.value = 7200
-        silverType.value = '纹银(时价估算)'
-        isMock.value = true
-    } finally {
-        loadingPrice.value = false
+        })
+        return results.length > 0 ? results : []
+    } catch (e) {
+        console.error('JSON 解析失败:', e)
+        return []
     }
 }
 
 // 咨询 AI
 const askAI = async () => {
-    if (!salary.value || loadingAI.value) return
+    if (!salary.value || !silverPrice.value || loadingAI.value) return
 
     loadingAI.value = true
-    aiAnalysis.value = null
+    aiResults.value = []
 
     const messages: ChatMessage[] = [
         {
             role: 'system',
-            content: `你是一位精通明清社会经济的史官或算命先生。请根据用户提供的月薪折合白银数量（两），分析其在古代对应的社会地位和职业。
-请严格按照以下标签格式返回，使用古风、典雅且生动的辞令，不要有任何多余废话：
-<title>这里写职业称号（如：翰林院编修、江南丝绸商、边关校尉等）</title>
-<level>这里写生活水平描述（如：钟鸣鼎食、衣食无忧、清贫乐道等）</level>
-<desc>这里写一段生动的穿越生活描述，字数在100字以内，语气要符合古代背景</desc>
-<suggest>这里写一条给用户的古代生存锦囊</suggest>`
+            content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两），同时分析其在 汉、唐、宋、明、清 五个朝代对应的社会地位。
+请注意：不同朝代银两价值和度量衡标准差异极大。
+请结合各朝代真实的购买力给出职业和生活分析，并务必提供该朝代的【物价参考】。
+
+请直接返回 JSON 格式数据，不要有任何开场白或解释。
+JSON 结构如下：
+{
+  "汉": { "dynasty": "大汉西汉年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
+  "唐": { "dynasty": "大唐贞观年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
+  "宋": { "dynasty": "大宋开宝年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
+  "明": { "dynasty": "大明万历年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
+  "清": { "dynasty": "大清康熙年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" }
+}`
         },
         {
             role: 'user',
-            content: `余月俸 ${salary.value} 文，折合今日纹银 ${taels.value} 两。`
+            content: `余月俸 ${salary.value} 文。
+按历代度量衡折算：
+- 汉代：${calculateDynastyTaels('汉')} 两
+- 唐代：${calculateDynastyTaels('唐')} 两
+- 宋代：${calculateDynastyTaels('宋')} 两
+- 明清：${calculateDynastyTaels('明')} 两
+请据此批阅。`
         }
     ]
 
     try {
         const content = await zhipuApi.chat(messages)
-        aiAnalysis.value = parseAIResponse(content)
+        aiResults.value = parseAIResponse(content)
     } catch (error) {
         console.error('AI 接口调用失败', error)
-        aiAnalysis.value = {
-            title: '时空浪人',
-            level: '身无分文',
-            desc: '由于时空波动（网络错误），你暂时流落在古代街头。',
-            suggest: '建议原地等待，或者检查一下你的网络连接。'
-        }
+        aiResults.value = [
+            {
+                dynasty: '时空缝隙',
+                title: '时空浪人',
+                level: '身无分文',
+                price_ref: '详见史料',
+                desc: '由于时空波动（网络错误），你暂时流落在古代街头。',
+                suggest: '建议原地等待，或者检查一下你的网络连接。'
+            }
+        ]
     } finally {
         loadingAI.value = false
     }
 }
 
-onMounted(() => {
-    fetchSilverPrice()
-})
+onMounted(() => {})
 </script>
 
 <template>
@@ -152,10 +186,11 @@ onMounted(() => {
                 <div class="scroll-paper">
                     <!-- 银价状态 -->
                     <div class="silver-info">
-                        <span class="label">{{ silverType }}:</span>
-                        <span class="value" :class="{ 'is-mock': isMock }">{{ silverPrice }}</span>
-                        <span class="unit">两/千克</span>
-                        <span v-if="loadingPrice" class="loading-indicator"> 测算中...</span>
+                        <span class="label">当前银价:</span>
+                        <div class="manual-input-box">
+                            <input v-model="silverPrice" type="number" placeholder="请输入今日银价" class="manual-silver-input" />
+                        </div>
+                        <span class="unit">元/克</span>
                     </div>
 
                     <div class="input-section">
@@ -163,13 +198,13 @@ onMounted(() => {
                             <span>吾之月俸：</span>
                             <div class="input-box">
                                 <input v-model="salary" type="number" placeholder="请输入月薪" @keyup.enter="askAI" />
-                                <span class="unit">文</span>
+                                <span class="unit">元</span>
                             </div>
                         </div>
                         <div class="action-row">
-                            <button class="ancient-btn" :disabled="!salary || loadingAI" @click="askAI">
-                                <span v-if="!loadingAI">开启时空</span>
-                                <span v-else>演化中...</span>
+                            <button class="ancient-btn" :disabled="!salary || !silverPrice || loadingAI" @click="askAI">
+                                <span v-if="!loadingAI">咨询主簿</span>
+                                <span v-else>主簿批阅中...</span>
                             </button>
                         </div>
                     </div>
@@ -180,44 +215,62 @@ onMounted(() => {
                             <div class="divider"></div>
 
                             <div class="tael-result">
-                                <p class="label">—— 折合今日纹银 ——</p>
-                                <div class="number-wrap">
-                                    <span class="number">{{ taels }}</span>
-                                    <span class="unit">两</span>
+                                <p class="label">—— 历代俸银换算 ——</p>
+                                <div class="dynasty-taels-list">
+                                    <div v-for="(weight, dynasty) in dynastyStandards" :key="dynasty" class="dynasty-tael-item">
+                                        <span class="dynasty-name">{{ dynasty }}代：</span>
+                                        <span class="dynasty-value">{{ calculateDynastyTaels(dynasty) }}</span>
+                                        <span class="dynasty-unit">两</span>
+                                    </div>
+                                    <div class="dynasty-tael-item modern">
+                                        <span class="dynasty-name">现代(50g)：</span>
+                                        <span class="dynasty-value">{{ taels }}</span>
+                                        <span class="dynasty-unit">两</span>
+                                    </div>
                                 </div>
                             </div>
 
                             <!-- AI 分析 -->
-                            <div v-if="aiAnalysis || loadingAI" class="ai-scroll-content">
+                            <div v-if="aiResults.length > 0 || loadingAI" class="ai-scroll-content">
                                 <div v-if="loadingAI" class="ai-loading">
                                     <div class="loading-spinner"></div>
-                                    <p>主簿正翻阅《大清会典》...</p>
+                                    <p>主簿正翻阅《历代职官志》...</p>
                                 </div>
 
-                                <div v-else-if="aiAnalysis" class="analysis-paper">
-                                    <div class="analysis-header">
-                                        <h3>《前程简批》</h3>
-                                    </div>
-                                    <div class="analysis-body">
-                                        <div class="info-grid">
-                                            <div class="info-item">
-                                                <span class="key">所获身份：</span>
-                                                <span class="val highlight">{{ aiAnalysis.title }}</span>
+                                <div v-else class="results-grid">
+                                    <div v-for="(item, index) in aiResults" :key="index" class="analysis-paper">
+                                        <div class="analysis-header">
+                                            <h3>《{{ item.dynasty }} · 前程简批》</h3>
+                                        </div>
+                                        <div class="analysis-body">
+                                            <div class="info-grid">
+                                                <div class="info-item">
+                                                    <span class="key">折合银两：</span>
+                                                    <span class="val highlight">{{ calculateDynastyTaels(item.dynasty) }} 两</span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <span class="key">所获身份：</span>
+                                                    <span class="val">{{ item.title }}</span>
+                                                </div>
+                                                <div class="info-item">
+                                                    <span class="key">生活水平：</span>
+                                                    <span class="val">{{ item.level }}</span>
+                                                </div>
+                                                <div class="info-item full-width">
+                                                    <span class="key">当年物价：</span>
+                                                    <span class="val price-text">{{ item.price_ref }}</span>
+                                                </div>
                                             </div>
-                                            <div class="info-item">
-                                                <span class="key">生活水平：</span>
-                                                <span class="val">{{ aiAnalysis.level }}</span>
+                                            <div class="desc-box">
+                                                <p>{{ item.desc }}</p>
+                                            </div>
+                                            <div class="suggest-box">
+                                                <span class="key">【生存锦囊】</span>
+                                                <p>{{ item.suggest }}</p>
                                             </div>
                                         </div>
-                                        <div class="desc-box">
-                                            <p>{{ aiAnalysis.desc }}</p>
-                                        </div>
-                                        <div class="suggest-box">
-                                            <span class="key">【生存锦囊】</span>
-                                            <p>{{ aiAnalysis.suggest }}</p>
-                                        </div>
+                                        <div class="seal-bottom">准</div>
                                     </div>
-                                    <div class="seal-bottom">准</div>
                                 </div>
                             </div>
                         </div>
@@ -236,7 +289,7 @@ onMounted(() => {
 
 <style scoped>
 .app-wrapper {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 20px 40px;
     min-height: 100vh;
@@ -420,7 +473,7 @@ onMounted(() => {
     background: #fdfaf0;
     border-left: 2px solid #e2d1b3;
     border-right: 2px solid #e2d1b3;
-    padding: 40px;
+    padding: 40px 20px; /* 减少左右内边距，给网格更多空间 */
     min-height: 200px;
     position: relative;
     z-index: 1;
@@ -429,21 +482,40 @@ onMounted(() => {
 
 /* 银价信息 */
 .silver-info {
-    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
     font-size: 14px;
     color: #777;
     margin-bottom: 40px;
     font-family: 'Kaiti', serif;
+    gap: 10px;
+}
+
+.manual-input-box {
+    border-bottom: 1px solid #9b2226;
+}
+
+.manual-silver-input {
+    background: transparent;
+    border: none;
+    width: 100px;
+    text-align: center;
+    font-size: 16px;
+    color: #9b2226;
+    outline: none;
+    font-family: 'Kaiti', serif;
+}
+
+.manual-silver-input::-webkit-outer-spin-button,
+.manual-silver-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .silver-info .value {
     color: #1a1a1a;
     font-weight: bold;
-    margin: 0 5px;
-}
-
-.silver-info .value.is-mock {
-    color: #9b2226;
 }
 
 /* 输入区域 */
@@ -479,7 +551,7 @@ onMounted(() => {
     text-align: center;
     color: #1a1a1a;
     outline: none;
-    font-family: "Kaiti", serif;
+    font-family: 'Kaiti', serif;
 }
 
 /* 隐藏数字输入框调节钮 */
@@ -489,7 +561,7 @@ onMounted(() => {
     margin: 0;
 }
 
-.input-box input[type="number"] {
+.input-box input[type='number'] {
     -moz-appearance: textfield;
 }
 
@@ -499,21 +571,23 @@ onMounted(() => {
 }
 
 .ancient-btn {
-    padding: 12px 40px;
-    background: #1a1a1a;
+    padding: 15px 50px;
+    background: #9b2226; /* 改为朱砂红，更显眼 */
     color: #fdfaf0;
-    font-size: 18px;
-    font-family: "Ma Shan Zheng", serif;
-    letter-spacing: 0.2em;
+    font-size: 20px;
+    font-family: 'Ma Shan Zheng', 'Kaiti', serif;
+    letter-spacing: 0.3em;
     border: none;
     cursor: pointer;
     transition: all 0.3s;
-    box-shadow: 4px 4px 0 #9b2226;
+    box-shadow: 4px 4px 0 #1a1a1a;
+    border-radius: 4px;
 }
 
 .ancient-btn:hover:not(:disabled) {
     transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 #9b2226;
+    box-shadow: 6px 6px 0 #1a1a1a;
+    background: #b91d1d;
 }
 
 .ancient-btn:disabled {
@@ -528,6 +602,28 @@ onMounted(() => {
     margin-top: 40px;
 }
 
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 默认两列 */
+    gap: 30px;
+    margin-top: 20px;
+}
+
+@media (max-width: 900px) {
+    .results-grid {
+        grid-template-columns: 1fr; /* 移动端单列 */
+    }
+}
+
+@media (max-width: 600px) {
+    .app-wrapper {
+        padding: 10px;
+    }
+    .scroll-paper {
+        padding: 30px 15px;
+    }
+}
+
 .divider {
     height: 2px;
     background: linear-gradient(to right, transparent, #e2d1b3, transparent);
@@ -537,31 +633,56 @@ onMounted(() => {
 .tael-result {
     text-align: center;
     margin-bottom: 40px;
+    padding: 20px;
+    background: rgba(155, 34, 38, 0.03);
+    border-radius: 8px;
 }
 
 .tael-result .label {
     color: #888;
     font-family: 'Kaiti', serif;
+    margin-bottom: 15px;
 }
 
-.number-wrap {
+.dynasty-taels-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+}
+
+.dynasty-tael-item {
     display: flex;
     align-items: baseline;
-    justify-content: center;
-    gap: 10px;
+    gap: 6px;
+    padding: 10px 20px;
+    background: #fff;
+    border: 1px solid #e2d1b3;
+    border-radius: 4px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.03);
 }
 
-.number-wrap .number {
-    font-size: 72px;
-    font-weight: bold;
-    font-family: 'Ma Shan Zheng', serif;
-    color: #1a1a1a;
+.dynasty-tael-item.modern {
+    border-color: #9b2226;
+    background: #fdf2f2;
 }
 
-.number-wrap .unit {
-    font-size: 24px;
-    color: #555;
+.dynasty-name {
+    font-size: 15px;
+    color: #666;
     font-family: 'Kaiti', serif;
+}
+
+.dynasty-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #1a1a1a;
+    font-family: 'Ma Shan Zheng', serif;
+}
+
+.dynasty-unit {
+    font-size: 16px;
+    color: #888;
 }
 
 /* AI 结果纸张 */
@@ -588,9 +709,9 @@ onMounted(() => {
 }
 
 .info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    display: flex;
+    flex-direction: column; /* 改为垂直排列，避免文字拥挤 */
+    gap: 15px;
     margin-bottom: 25px;
 }
 
@@ -606,6 +727,19 @@ onMounted(() => {
 
 .info-item .val.highlight {
     color: #9b2226;
+}
+
+.info-item.full-width {
+    grid-column: span 2;
+    border-top: 1px dashed #eee;
+    padding-top: 10px;
+    margin-top: 5px;
+}
+
+.price-text {
+    font-size: 15px !important;
+    color: #666;
+    font-style: italic;
 }
 
 .desc-box {
