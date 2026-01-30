@@ -38,10 +38,10 @@ const parseAIResponse = (content: string): AIAnalysis => {
     }
 
     return {
-        title: getTagContent('title') || '神秘路人',
-        level: getTagContent('level') || '未知',
+        title: getTagContent('title') || '无名布衣',
+        level: getTagContent('level') || '尚可',
         desc: getTagContent('desc') || content,
-        suggest: getTagContent('suggest') || '既然穿越了，就多看看风景吧。'
+        suggest: getTagContent('suggest') || '平安即是福。'
     }
 }
 
@@ -57,7 +57,7 @@ const fetchSilverPrice = async () => {
             const agtd = response.data.result.find((item: any) => item.type === 'Ag(T+D)')
             if (agtd) {
                 silverPrice.value = parseFloat(agtd.price)
-                silverType.value = agtd.typename
+                silverType.value = '今日纹银'
             }
         } else {
             throw new Error('API Error')
@@ -65,7 +65,7 @@ const fetchSilverPrice = async () => {
     } catch (error) {
         console.warn('获取银价失败，使用模拟数据', error)
         silverPrice.value = 7200
-        silverType.value = '实时白银(估算)'
+        silverType.value = '纹银(时价估算)'
         isMock.value = true
     } finally {
         loadingPrice.value = false
@@ -82,15 +82,16 @@ const askAI = async () => {
     const messages: ChatMessage[] = [
         {
             role: 'system',
-            content: `你是一个专业的历史社会地位分析AI。请根据用户提供的月薪折合白银数量，严格按照以下标签格式返回分析结果，不要有任何开场白或多余废话：
-<title>这里写职业称号</title>
-<level>这里写生活水平描述</level>
-<desc>这里写一段生动的穿越生活描述，字数控制在100字以内</desc>
-<suggest>这里写一条给用户的趣味古代生存建议</suggest>`
+            content: `你是一位精通明清社会经济的史官或算命先生。请根据用户提供的月薪折合白银数量（两），分析其在古代对应的社会地位和职业。
+请严格按照以下标签格式返回，使用古风、典雅且生动的辞令，不要有任何多余废话：
+<title>这里写职业称号（如：翰林院编修、江南丝绸商、边关校尉等）</title>
+<level>这里写生活水平描述（如：钟鸣鼎食、衣食无忧、清贫乐道等）</level>
+<desc>这里写一段生动的穿越生活描述，字数在100字以内，语气要符合古代背景</desc>
+<suggest>这里写一条给用户的古代生存锦囊</suggest>`
         },
         {
             role: 'user',
-            content: `我的月薪是 ${salary.value} 元，折合今日白银约 ${taels.value} 两。`
+            content: `余月俸 ${salary.value} 文，折合今日纹银 ${taels.value} 两。`
         }
     ]
 
@@ -117,114 +118,125 @@ onMounted(() => {
 
 <template>
     <div class="app-wrapper">
-        <!-- 顶部状态栏样式 -->
+        <!-- 顶部状态栏 -->
         <div class="top-nav">
             <div class="nav-left">
-                <div class="status-indicator"><span class="dot"></span> ready</div>
-                <div class="path">~/ silverera <span class="cursor">|</span></div>
+                <div class="status-indicator"><span class="dot"></span> 乾坤待定</div>
+                <div class="path">~/ 银色春秋 <span class="cursor">|</span></div>
             </div>
             <div class="nav-right">
-                <div class="nav-item">$ ai --analyze</div>
-                <div class="nav-item">$ cd /history</div>
-                <div class="nav-item login-btn">Sign In</div>
+                <div class="nav-item">考功</div>
+                <div class="nav-item">方志</div>
+                <div class="nav-item login-btn">登入</div>
             </div>
         </div>
 
         <main class="main-content">
-            <!-- 页面标题参考 LensAI 风格 -->
+            <!-- 页面标题 -->
             <header class="page-header">
-                <div class="file-name">● ● ● silverera.vision</div>
-                <div class="comment-line">// main.ts</div>
+                <div class="file-name">卷一 · 薪俸考</div>
+                <div class="comment-line">/* 凡月薪几何，换算纹银，以观前程 */</div>
                 <div class="title-group">
-                    <span class="arrow-icon"></span>
+                    <div class="seal-icon">银</div>
                     <div class="text-wrap">
-                        <h1>薪资锐评</h1>
-                        <h2 class="sub-title">SilverEra<span>|</span></h2>
+                        <h1>银色春秋</h1>
+                        <h2 class="sub-title">SilverEra</h2>
                     </div>
                 </div>
-                <div class="intro-line">> 拒绝幻想，直击灵魂。基于银价波动与历史数据的“毒舌”月薪分析，解构每一两白银的含金量。</div>
+                <div class="intro-line">昔者，银钱之动，牵乎国计民生。 今以算法拟古之物价，助尔窥见若置身盛世，当为何等身份。</div>
             </header>
 
-            <!-- 核心工作区卡片 (类似代码编辑器窗口) -->
-            <div class="editor-window">
-                <div class="window-header">
-                    <div class="dots">
-                        <span class="dot red"></span>
-                        <span class="dot yellow"></span>
-                        <span class="dot green"></span>
-                    </div>
-                    <div class="window-title">SALARY-ANALYZER.TSX</div>
-                </div>
-
-                <div class="window-body">
-                    <!-- 银价状态栏 -->
-                    <div class="silver-status-bar">
-                        <span class="label">LIVE_PRICE:</span>
+            <!-- 核心卷轴容器 -->
+            <div class="scroll-container">
+                <div class="scroll-handle top"></div>
+                <div class="scroll-paper">
+                    <!-- 银价状态 -->
+                    <div class="silver-info">
+                        <span class="label">{{ silverType }}:</span>
                         <span class="value" :class="{ 'is-mock': isMock }">{{ silverPrice }}</span>
-                        <span class="unit">CNY/KG</span>
-                        <span v-if="loadingPrice" class="loading-indicator">SYNCING...</span>
+                        <span class="unit">两/千克</span>
+                        <span v-if="loadingPrice" class="loading-indicator"> 测算中...</span>
                     </div>
 
-                    <div class="input-area">
-                        <div class="code-line">
-                            <span class="keyword">const</span> <span class="variable">monthlySalary</span> =
-                            <input v-model="salary" type="number" placeholder="输入月薪..." @keyup.enter="askAI" />;
+                    <div class="input-section">
+                        <div class="input-row">
+                            <span>吾之月俸：</span>
+                            <div class="input-box">
+                                <input v-model="salary" type="number" placeholder="请输入月薪" @keyup.enter="askAI" />
+                                <span class="unit">文</span>
+                            </div>
                         </div>
-                        <div class="code-line action-line">
-                            <span class="keyword">await</span> <span class="function">startTravel</span>(<span class="variable">monthlySalary</span>);
-                            <button class="execute-btn" :disabled="!salary || loadingAI" @click="askAI">
-                                {{ loadingAI ? 'RUNNING...' : 'EXECUTE' }}
+                        <div class="action-row">
+                            <button class="ancient-btn" :disabled="!salary || loadingAI" @click="askAI">
+                                <span v-if="!loadingAI">开启时空</span>
+                                <span v-else>演化中...</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- 计算结果 -->
-                    <transition name="fade">
+                    <!-- 结果展示 -->
+                    <transition name="scroll-unfold">
                         <div v-if="salary && silverPrice" class="result-display">
-                            <div class="calculation-result">
-                                <span class="comment">/* 折合白银 */</span>
-                                <div class="tael-box">
+                            <div class="divider"></div>
+
+                            <div class="tael-result">
+                                <p class="label">—— 折合今日纹银 ——</p>
+                                <div class="number-wrap">
                                     <span class="number">{{ taels }}</span>
-                                    <span class="unit">TAELS</span>
+                                    <span class="unit">两</span>
                                 </div>
                             </div>
 
-                            <!-- AI 分析区域 (类似注释块) -->
-                            <div v-if="aiAnalysis || loadingAI" class="ai-block">
-                                <div class="block-header">/** AI ANALYSIS */</div>
+                            <!-- AI 分析 -->
+                            <div v-if="aiAnalysis || loadingAI" class="ai-scroll-content">
+                                <div v-if="loadingAI" class="ai-loading">
+                                    <div class="loading-spinner"></div>
+                                    <p>主簿正翻阅《大清会典》...</p>
+                                </div>
 
-                                <div v-if="loadingAI" class="ai-loading"><span class="cursor">></span> 正在解析历史卷宗...</div>
-
-                                <div v-else-if="aiAnalysis" class="ai-content">
-                                    <div class="ai-item">
-                                        <span class="ai-key">* @identity:</span>
-                                        <span class="ai-val highlight">{{ aiAnalysis.title }}</span>
+                                <div v-else-if="aiAnalysis" class="analysis-paper">
+                                    <div class="analysis-header">
+                                        <h3>《前程简批》</h3>
                                     </div>
-                                    <div class="ai-item">
-                                        <span class="ai-key">* @status:</span>
-                                        <span class="ai-val">{{ aiAnalysis.level }}</span>
+                                    <div class="analysis-body">
+                                        <div class="info-grid">
+                                            <div class="info-item">
+                                                <span class="key">所获身份：</span>
+                                                <span class="val highlight">{{ aiAnalysis.title }}</span>
+                                            </div>
+                                            <div class="info-item">
+                                                <span class="key">生活水平：</span>
+                                                <span class="val">{{ aiAnalysis.level }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="desc-box">
+                                            <p>{{ aiAnalysis.desc }}</p>
+                                        </div>
+                                        <div class="suggest-box">
+                                            <span class="key">【生存锦囊】</span>
+                                            <p>{{ aiAnalysis.suggest }}</p>
+                                        </div>
                                     </div>
-                                    <div class="ai-desc">* @description: {{ aiAnalysis.desc }}</div>
-                                    <div class="ai-suggest">* @survival_tip: {{ aiAnalysis.suggest }}</div>
-                                    <div class="block-footer">*/</div>
+                                    <div class="seal-bottom">准</div>
                                 </div>
                             </div>
                         </div>
                     </transition>
                 </div>
+                <div class="scroll-handle bottom"></div>
             </div>
         </main>
 
         <footer class="page-footer">
-            <div class="footer-logo">🥈 SILVERERA</div>
-            <div class="footer-info">由 GLM-4-FLASH 灵感智能驱动 · 实验性历史模拟系统</div>
+            <div class="footer-logo">🥈 银色春秋 · 庚子年制</div>
+            <div class="footer-info">基于 GLM-4-FLASH 灵感演化 · 纯属趣味模拟</div>
         </footer>
     </div>
 </template>
 
 <style scoped>
 .app-wrapper {
-    max-width: 1000px;
+    max-width: 800px;
     margin: 0 auto;
     padding: 20px 40px;
     min-height: 100vh;
@@ -232,15 +244,16 @@ onMounted(() => {
     flex-direction: column;
 }
 
-/* 顶部状态栏 */
+/* 顶部状态栏 - 古风化 */
 .top-nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
-    font-size: 12px;
-    color: #666;
+    padding: 15px 0;
+    font-size: 13px;
+    color: #5d5d5d;
     margin-bottom: 40px;
+    border-bottom: 1px double #ccc;
 }
 
 .nav-left {
@@ -256,22 +269,23 @@ onMounted(() => {
 }
 
 .nav-item {
-    padding: 4px 10px;
-    border-radius: 4px;
-    background: #f5f5f5;
-    color: #00c853;
+    padding: 4px 12px;
+    border: 1px solid #dcdcdc;
+    background: rgba(255, 255, 255, 0.5);
+    color: #444;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
 }
 
 .nav-item:hover {
-    background: #e0e0e0;
+    background: #eee;
+    border-color: #999;
 }
 
 .login-btn {
-    background: #fff3e0;
-    color: #ff6d00;
-    font-weight: bold;
+    background: #9b2226; /* 朱砂红 */
+    color: #f4f1de;
+    border-color: #9b2226;
 }
 
 .status-indicator {
@@ -281,14 +295,15 @@ onMounted(() => {
 }
 
 .status-indicator .dot {
-    width: 8px;
-    height: 8px;
-    background-color: #00c853;
+    width: 6px;
+    height: 6px;
+    background-color: #9b2226;
     border-radius: 50%;
+    box-shadow: 0 0 5px rgba(155, 34, 38, 0.5);
 }
 
 .path .cursor {
-    color: #ff6d00;
+    color: #9b2226;
     animation: blink 1s infinite;
 }
 
@@ -301,355 +316,404 @@ onMounted(() => {
 /* 页面标题区 */
 .page-header {
     margin-bottom: 50px;
+    text-align: center;
 }
 
 .file-name {
     font-size: 14px;
-    color: #999;
+    color: #888;
     margin-bottom: 8px;
+    letter-spacing: 0.2em;
 }
 
 .comment-line {
     font-size: 14px;
-    color: #ccc;
-    margin-bottom: 20px;
+    color: #aaa;
+    margin-bottom: 30px;
     font-style: italic;
 }
 
 .title-group {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    justify-content: center;
     gap: 20px;
     margin-bottom: 24px;
 }
 
-.arrow-icon {
-    margin-top: 10px;
-    width: 0;
-    height: 0;
-    border-top: 12px solid transparent;
-    border-bottom: 12px solid transparent;
-    border-left: 18px solid #ff6d00;
+.seal-icon {
+    width: 50px;
+    height: 50px;
+    border: 3px solid #9b2226;
+    color: #9b2226;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Ma Shan Zheng', serif;
+    font-weight: bold;
+    padding: 5px;
+    transform: rotate(-5deg);
+    box-shadow: 2px 2px 0 rgba(155, 34, 38, 0.2);
 }
 
 .text-wrap h1 {
-    font-size: 48px;
+    font-size: 42px;
     margin: 0;
-    font-weight: 800;
+    font-weight: bold;
     color: #1a1a1a;
+    font-family: 'Ma Shan Zheng', serif;
 }
 
 .sub-title {
-    font-size: 48px;
+    font-size: 18px;
     margin: 0;
-    font-weight: 800;
-    color: #ccc;
-}
-
-.sub-title span {
-    background: #ccc;
-    width: 15px;
-    display: inline-block;
-    height: 40px;
-    margin-left: 5px;
-    vertical-align: middle;
+    color: #999;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
 }
 
 .intro-line {
     font-size: 16px;
-    color: #888;
-    line-height: 1.6;
-    max-width: 600px;
+    color: #555;
+    line-height: 1.8;
+    max-width: 500px;
+    margin: 0 auto;
+    font-family: 'Kaiti', serif;
 }
 
-/* 编辑器窗口容器 */
-.editor-window {
-    background: #ffffff;
-    border-radius: 12px;
-    border: 1px solid #e0e0e0;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
+/* 卷轴容器 */
+.scroll-container {
+    position: relative;
     margin-bottom: 60px;
 }
 
-.window-header {
-    background: #f8f8f8;
-    padding: 12px 20px;
-    border-bottom: 1px solid #e0e0e0;
-    display: flex;
-    align-items: center;
+.scroll-handle {
+    height: 25px;
+    background: linear-gradient(to right, #4a4a4a, #2a2a2a, #4a4a4a);
+    border-radius: 12px;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
-.dots {
-    display: flex;
-    gap: 8px;
-    margin-right: 20px;
-}
-
-.dot {
-    width: 12px;
-    height: 12px;
+.scroll-handle::before,
+.scroll-handle::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    width: 35px;
+    height: 35px;
+    background: #8b5e34;
     border-radius: 50%;
+    border: 3px solid #5d4037;
 }
 
-.red {
-    background: #ff5f56;
+.scroll-handle::before {
+    left: -10px;
 }
-.yellow {
-    background: #ffbd2e;
-}
-.green {
-    background: #27c93f;
+.scroll-handle::after {
+    right: -10px;
 }
 
-.window-title {
-    font-size: 12px;
-    color: #999;
-    letter-spacing: 0.1em;
+.scroll-paper {
+    background: #fdfaf0;
+    border-left: 2px solid #e2d1b3;
+    border-right: 2px solid #e2d1b3;
+    padding: 40px;
+    min-height: 200px;
+    position: relative;
+    z-index: 1;
+    box-shadow: inset 0 0 50px rgba(226, 209, 179, 0.3);
 }
 
-.window-body {
-    padding: 30px;
-}
-
-/* 银价状态栏 */
-.silver-status-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    margin-bottom: 30px;
-    color: #666;
-}
-
-.silver-status-bar .value {
-    font-weight: bold;
-    color: #1a1a1a;
-}
-
-.silver-status-bar .value.is-mock {
-    color: #ff6d00;
-}
-
-.loading-indicator {
-    font-size: 11px;
-    color: #00c853;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    50% {
-        opacity: 0.5;
-    }
-}
-
-/* 输入区域代码风 */
-.input-area {
-    margin-bottom: 40px;
-}
-
-.code-line {
-    font-size: 18px;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.keyword {
-    color: #d32f2f;
-}
-.variable {
-    color: #1976d2;
-}
-.function {
-    color: #7b1fa2;
-}
-
-input {
-    border: none;
-    background: #f5f5f5;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 18px;
-    color: #1a1a1a;
-    width: 150px;
-    outline: none;
-    border-bottom: 2px solid transparent;
-    transition: all 0.3s;
-}
-
-input:focus {
-    background: #eeeeee;
-    border-bottom-color: #ff6d00;
-}
-
-.execute-btn {
-    background: #ff6d00;
-    color: white;
-    padding: 6px 16px;
-    border-radius: 4px;
+/* 银价信息 */
+.silver-info {
+    text-align: right;
     font-size: 14px;
+    color: #777;
+    margin-bottom: 40px;
+    font-family: 'Kaiti', serif;
+}
+
+.silver-info .value {
+    color: #1a1a1a;
     font-weight: bold;
-    margin-left: 20px;
+    margin: 0 5px;
+}
+
+.silver-info .value.is-mock {
+    color: #9b2226;
+}
+
+/* 输入区域 */
+.input-section {
+    margin-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 20px;
+    font-family: 'Kaiti', serif;
+}
+
+.input-box {
+    border-bottom: 2px solid #9b2226;
+    padding-bottom: 5px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.input-box input {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    width: 180px;
+    text-align: center;
+    color: #1a1a1a;
+    outline: none;
+    font-family: "Kaiti", serif;
+}
+
+/* 隐藏数字输入框调节钮 */
+.input-box input::-webkit-outer-spin-button,
+.input-box input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.input-box input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.input-box input::placeholder {
+    color: #bbb;
+    font-size: 18px;
+}
+
+.ancient-btn {
+    padding: 12px 40px;
+    background: #1a1a1a;
+    color: #fdfaf0;
+    font-size: 18px;
+    font-family: "Ma Shan Zheng", serif;
+    letter-spacing: 0.2em;
+    border: none;
+    cursor: pointer;
     transition: all 0.3s;
+    box-shadow: 4px 4px 0 #9b2226;
 }
 
-.execute-btn:hover:not(:disabled) {
-    background: #e65100;
-    transform: translateY(-1px);
+.ancient-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #9b2226;
 }
 
-.execute-btn:disabled {
-    background: #ccc;
+.ancient-btn:disabled {
+    background: #d0d0d0;
+    color: #888;
+    box-shadow: 4px 4px 0 #bbb;
     cursor: not-allowed;
 }
 
 /* 结果展示 */
 .result-display {
-    border-top: 1px solid #f0f0f0;
-    padding-top: 30px;
+    margin-top: 40px;
 }
 
-.calculation-result {
+.divider {
+    height: 2px;
+    background: linear-gradient(to right, transparent, #e2d1b3, transparent);
+    margin: 30px 0;
+}
+
+.tael-result {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 40px;
 }
 
-.comment {
-    display: block;
-    font-size: 14px;
-    color: #00c853;
-    margin-bottom: 10px;
+.tael-result .label {
+    color: #888;
+    font-family: 'Kaiti', serif;
 }
 
-.tael-box {
+.number-wrap {
     display: flex;
     align-items: baseline;
     justify-content: center;
     gap: 10px;
 }
 
-.tael-box .number {
-    font-size: 64px;
-    font-weight: 800;
+.number-wrap .number {
+    font-size: 72px;
+    font-weight: bold;
+    font-family: 'Ma Shan Zheng', serif;
     color: #1a1a1a;
 }
 
-.tael-box .unit {
-    font-size: 20px;
-    color: #999;
-}
-
-/* AI 分析块样式 */
-.ai-block {
-    background: #f9f9f9;
-    border-radius: 8px;
-    padding: 24px;
+.number-wrap .unit {
+    font-size: 24px;
     color: #555;
-    font-size: 15px;
+    font-family: 'Kaiti', serif;
+}
+
+/* AI 结果纸张 */
+.analysis-paper {
+    background: #fff;
+    padding: 30px;
+    border: 1px solid #eee;
+    box-shadow: 2px 2px 15px rgba(0, 0, 0, 0.05);
+    position: relative;
+    border-top: 5px solid #9b2226;
+}
+
+.analysis-header {
+    text-align: center;
+    margin-bottom: 25px;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 15px;
+}
+
+.analysis-header h3 {
+    margin: 0;
+    color: #1a1a1a;
+    font-family: 'Ma Shan Zheng', serif;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.info-item .key {
+    color: #888;
+    font-size: 14px;
+}
+
+.info-item .val {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.info-item .val.highlight {
+    color: #9b2226;
+}
+
+.desc-box {
     line-height: 1.8;
+    color: #444;
+    margin-bottom: 25px;
+    font-family: 'Kaiti', serif;
+    padding: 15px;
+    background: #fcfcfc;
+    border-left: 3px solid #ddd;
 }
 
-.block-header {
-    color: #00c853;
-    margin-bottom: 15px;
-}
-
-.ai-item {
+.suggest-box .key {
+    display: block;
+    color: #9b2226;
+    font-weight: bold;
     margin-bottom: 8px;
 }
 
-.ai-key {
-    color: #00c853;
-    margin-right: 10px;
-}
-
-.ai-val.highlight {
+.seal-bottom {
+    position: absolute;
+    bottom: 20px;
+    right: 30px;
+    width: 40px;
+    height: 40px;
+    border: 2px solid #9b2226;
+    color: #9b2226;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Ma Shan Zheng', serif;
     font-weight: bold;
-    color: #1a1a1a;
-    text-decoration: underline;
-}
-
-.ai-desc,
-.ai-suggest {
-    color: #555;
-    margin-top: 8px;
-}
-
-.block-footer {
-    color: #00c853;
-    margin-top: 15px;
+    transform: rotate(15deg);
+    opacity: 0.6;
 }
 
 .ai-loading {
-    color: #999;
+    text-align: center;
+    padding: 40px 0;
+    color: #888;
 }
 
-.ai-loading .cursor {
-    color: #ff6d00;
+.loading-spinner {
+    width: 30px;
+    height: 30px;
+    border: 2px solid #eee;
+    border-top-color: #9b2226;
+    border-radius: 50%;
+    margin: 0 auto 15px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* 页脚 */
 .page-footer {
     margin-top: auto;
-    padding: 40px 0;
+    padding: 60px 0;
     text-align: center;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px double #ccc;
 }
 
 .footer-logo {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: bold;
-    letter-spacing: 0.2em;
+    font-family: 'Ma Shan Zheng', serif;
     margin-bottom: 10px;
 }
 
 .footer-info {
-    font-size: 11px;
+    font-size: 12px;
     color: #999;
+    font-family: 'Kaiti', serif;
+}
+
+/* 卷轴展开动画 */
+.scroll-unfold-enter-active {
+    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 1000px;
+    overflow: hidden;
+}
+
+.scroll-unfold-enter-from {
+    max-height: 0;
+    opacity: 0;
 }
 
 /* 响应式适配 */
 @media (max-width: 600px) {
-    .nav-right {
-        display: none;
-    }
-
     .app-wrapper {
         padding: 20px;
     }
-
-    .text-wrap h1,
-    .sub-title {
+    .text-wrap h1 {
         font-size: 32px;
     }
-
-    .tael-box .number {
-        font-size: 48px;
+    .number-wrap .number {
+        font-size: 54px;
     }
-
-    .code-line {
-        font-size: 14px;
+    .scroll-paper {
+        padding: 20px;
     }
-
-    input {
-        width: 100px;
-        font-size: 14px;
+    .info-grid {
+        grid-template-columns: 1fr;
     }
-}
-
-.fade-enter-active,
-.fade-leave-active {
-    transition:
-        opacity 0.5s ease,
-        transform 0.5s ease;
-}
-
-.fade-enter-from {
-    opacity: 0;
-    transform: translateY(10px);
 }
 </style>
 
