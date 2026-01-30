@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { zhipuApi, ChatMessage } from './zhipu'
+import { aiService, ChatMessage } from './services/ai'
 
 // 银价数据
 const silverPrice = ref<number>(Number(localStorage.getItem('silverPrice')) || 25)
@@ -90,25 +90,30 @@ const askAI = async () => {
     const messages: ChatMessage[] = [
         {
             role: 'system',
-            content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两），分析其在指定朝代的社会地位。
-请注意：不同朝代银两价值和度量衡标准差异极大。
+            content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两） and 目标朝代（用户将明确指定），分析其在该朝代的社会地位。
+
+重要注意事项：不同朝代的银两价值、度量衡标准、物价水平和社会结构差异极大。你的分析必须基于可靠的历史经济数据，避免现代偏见，并考虑该朝代的具体背景（如通货膨胀、区域差异等）。
 
 【核心要求】
-1. 目标朝代：${selectedDynasty.value}朝。
-2. 职业细化：给出具体的、有该朝代特征的身份（不要笼统，如“手工业者”）。
-3. 细分标签：为该身份提供3-4个细分标签（tags）。
-4. 真实物价：结合该朝代真实的购买力给出职业和生活分析，并务必提供具体的【物价参考】。
+1. 目标朝代：${selectedDynasty.value}朝。请严格以此朝代为基础进行分析。
+2. 职业多样化匹配：根据月俸水平，从“士农工商”及其他社会阶层（如军户、匠籍等）中匹配最贴切的身份。不要局限于官吏系统。收入分类应基于该朝代的典型收入范围（例如，低收入可能为月俸1-5两，中等收入5-50两，高收入50两以上，但需根据朝代调整），并参考以下方向：
+   - 若收入极高：考虑顶级富商（如盐商、外贸商）、高级文官或武将、皇亲国戚、大型庄园主。
+   - 若收入中等：考虑中小商人、专业匠师（如官窑匠人）、书院教习、地方小吏或中层军官。
+   - 若收入较低：考虑农民、劳工、小贩、仆役或士兵。
+3. 职业细化：提供具体的、有该朝代特征的身份名称。例如，在清朝，高收入者可能是“广州十三行丝绸商”，而非泛泛的“商人”；在宋朝，中等收入者可能是“汴京脚店店主”。
+4. 细分标签：为该身份提供3-4个细分标签（tags），描述其社会属性、行业、经济状况或生活状态。
+5. 真实物价分析：结合该朝代真实的购买力，提供职业和生活分析。务必提供具体的【物价参考】，如一石米、一匹布 or 一日工食的价格（以白银两为单位），并尽可能引用该朝代的常见数据 or 历史记载（如《中国货币史》等）。如果数据不确定，请注明估算来源。
 
-请直接返回 JSON 格式数据，不要有任何开场白或解释。
-JSON 结构如下：
+你的响应必须直接返回JSON格式数据，不要有任何开场白、解释或额外文本。
+JSON 结构必须如下：
 {
-  "dynasty": "${selectedDynasty.value}朝", 
-  "title": "具体的职业身份", 
+  "dynasty": "${selectedDynasty.value}朝",
+  "title": "具体的职业身份（需有朝代特征）",
   "tags": ["标签1", "标签2", "标签3"],
-  "level": "生活水平", 
-  "price_ref": "具体物价参考(如一石米多少钱)", 
-  "desc": "基于该职业的社会地位描述", 
-  "suggest": "生存锦囊" 
+  "level": "生活水平描述（如'赤贫'、'温饱'、'小康'、'富裕'、'豪奢'）",
+  "price_ref": "具体物价参考（例如'一石米约值白银0.5两，据《梦溪笔谈》记载'）",
+  "desc": "基于该职业的社会地位、月俸和物价的分析描述（包括在阶层中的位置、生活状况等）",
+  "suggest": "生存锦囊（针对该生活水平的实用建议，如储蓄、投资或规避风险）"
 }`
         },
         {
@@ -120,7 +125,7 @@ JSON 结构如下：
     ]
 
     try {
-        const content = await zhipuApi.chat(messages)
+        const content = await aiService.chat(messages)
         const result = parseAIResponse(content)
         if (result) aiResults.value = [result]
     } catch (error) {
@@ -486,6 +491,17 @@ onMounted(() => {})
 .input-wrapper input:focus {
     outline: none;
     border-color: #ff6b00;
+}
+
+/* 移除数字输入框控制按钮 */
+.input-wrapper input::-webkit-outer-spin-button,
+.input-wrapper input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.input-wrapper input[type='number'] {
+    -moz-appearance: textfield;
 }
 
 .unit {
