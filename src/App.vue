@@ -58,6 +58,7 @@ interface AIAnalysis {
 const aiResults = ref<AIAnalysis[]>([])
 const loadingAI = ref(false)
 const selectedDynasty = ref('清') // 默认选择清朝
+const showAnnual = ref(false)
 
 // 解析 AI 返回的内容
 const parseAIResponse = (content: string): AIAnalysis | null => {
@@ -98,7 +99,7 @@ const askAI = async () => {
             content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两）以及年薪总计（两），结合目标朝代的度量衡和经济背景，分析其在该朝代的社会地位。
 
 重要注意事项：
-1. 严禁混淆【月俸】与【年俸】：历史文献（如《大清会典》、《宋史·职官志》）中的官吏俸禄通常以“年”为单位。如果用户月入10两，年入则为120两。请务必将用户的年薪与历史上的年俸数据进行比对，而非直接用月薪比对年俸。
+1. 以【月收入】为主要基准进行对标与叙述。若引用史料的“年俸/岁入”，请先换算为“月均”（除以12）后再比较，并在 desc 中明确换算口径。
 2. 目标朝代：${selectedDynasty.value}朝。请严格以此朝代为基础进行分析。
 3. 职业多样化匹配：根据收入水平，从“士农工商”及其他社会阶层（如军户、匠籍等）中匹配最贴切的身份。
 4. 真实物价分析：结合该朝代真实的购买力，提供职业和生活分析。务必提供具体的【物价参考】，如一石米、一匹布的价格（以白银两为单位）。
@@ -111,7 +112,7 @@ JSON 结构必须如下：
   "tags": ["标签1", "标签2", "标签3"],
   "level": "生活水平描述（如'赤贫'、'温饱'、'小康'、'富裕'、'豪奢'）",
   "price_ref": "具体物价参考（例如'一石米约值白银0.5两，据《梦溪笔谈》记载'）",
-  "desc": "基于该职业的社会地位、月俸、年俸和物价的分析描述（请明确提到年收入在当时的水平）",
+  "desc": "基于该职业的社会地位、月收入与物价的分析描述（请明确提到月收入在当时的水平；若涉及年俸请换算为月均并说明）",
   "suggest": "生存锦囊"
 }`
         },
@@ -121,7 +122,7 @@ JSON 结构必须如下：
 按${selectedDynasty.value}代度量衡折算：
 - 月入约：${monthlyTaels} 两
 - 年入约：${annualTaels} 两
-请据此批阅。`
+请以月入为主批阅（年入仅作参考）。`
         }
     ]
 
@@ -220,7 +221,13 @@ onMounted(() => {})
                     <div class="window-title">换算结果 / 结果</div>
                 </div>
                 <div class="window-body">
-                    <div class="selection-hint">// 请点击选择一个朝代进行 AI 深度分析</div>
+                    <div class="selection-bar">
+                        <div class="selection-hint">// 请点击选择一个朝代进行 AI 深度分析（默认以月入为主）</div>
+                        <label class="annual-toggle">
+                            <input type="checkbox" v-model="showAnnual" />
+                            年入参考
+                        </label>
+                    </div>
                     <div class="dynasty-grid">
                         <div
                             v-for="(weight, dynasty) in dynastyStandards"
@@ -237,7 +244,8 @@ onMounted(() => {})
                                 <span class="amount">{{ calculateDynastyTaels(dynasty) }}</span>
                                 <span class="currency">两</span>
                             </div>
-                            <div class="card-footer">月俸对标</div>
+                            <div v-if="showAnnual" class="card-sub">年约 {{ calculateDynastyTaels(dynasty, true) }} 两</div>
+                            <div class="card-footer">月入对标</div>
                             <div class="select-indicator" v-if="selectedDynasty === dynasty">
                                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="20 6 9 17 4 12"></polyline>
@@ -270,6 +278,9 @@ onMounted(() => {})
                         <div class="ai-dynasty-header">
                             <span class="ai-tag-dynasty"># {{ item.dynasty }}</span>
                             <span class="ai-level">{{ item.level }}</span>
+                        </div>
+                        <div class="ai-taels">
+                            折算：月入 {{ calculateDynastyTaels(item.dynasty) }} 两<span v-if="showAnnual"> · 年入 {{ calculateDynastyTaels(item.dynasty, true) }} 两</span>
                         </div>
                         <h3 class="ai-title">{{ item.title }}</h3>
                         <!-- 细分职业标签 -->
@@ -652,8 +663,41 @@ onMounted(() => {})
     font-family: 'Fira Code', monospace;
     font-size: 0.8rem;
     color: #bdc3c7;
-    margin-bottom: 20px;
     padding-left: 4px;
+}
+
+.selection-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.annual-toggle {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    color: #95a5a6;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.annual-toggle input {
+    accent-color: #e67e22;
+}
+
+.card-sub {
+    font-size: 0.7rem;
+    color: #95a5a6;
+    margin-bottom: 8px;
+}
+
+.ai-taels {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    color: #95a5a6;
+    margin-bottom: 10px;
 }
 
 .card-header {
