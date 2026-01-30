@@ -7,7 +7,7 @@ const silverPrice = ref<number>(Number(localStorage.getItem('silverPrice')) || 2
 const silverType = ref('官定纹银')
 
 // 用户输入
-const salary = ref<number | null>(Number(localStorage.getItem('userSalary')) || null)
+const salary = ref<number | null>(Number(localStorage.getItem('userSalary')) || 3500)
 
 // 监听并缓存
 watch(silverPrice, newVal => {
@@ -46,48 +46,37 @@ const calculateDynastyTaels = (dynastyKey: string) => {
 interface AIAnalysis {
     dynasty: string
     title: string
+    tags: string[] // 新增：细分标签
     level: string
-    price_ref: string // 新增：当年物价参考
+    price_ref: string
     desc: string
     suggest: string
 }
 
 const aiResults = ref<AIAnalysis[]>([])
 const loadingAI = ref(false)
+const selectedDynasty = ref('清') // 默认选择清朝
 
-// 解析 AI 返回的内容 (支持多个朝代 JSON 格式)
-const parseAIResponse = (content: string): AIAnalysis[] => {
+// 解析 AI 返回的内容
+const parseAIResponse = (content: string): AIAnalysis | null => {
     try {
-        // 提取 JSON 字符串（处理可能存在的 markdown 代码块）
         const jsonMatch = content.match(/\{[\s\S]*\}/)
         const jsonStr = jsonMatch ? jsonMatch[0] : content
         const data = JSON.parse(jsonStr)
 
-        // 兼容不同的返回格式（数组或对象）
-        if (Array.isArray(data)) return data
-        if (data.results) return data.results
-        if (data.data) return data.data
-
-        // 如果是按朝代作为 key 的对象
-        const dynasties = ['汉', '唐', '宋', '明', '清']
-        const results: AIAnalysis[] = []
-        dynasties.forEach(d => {
-            const key = Object.keys(data).find(k => k.includes(d))
-            if (key && data[key]) {
-                results.push({
-                    dynasty: data[key].dynasty || `${d}朝`,
-                    title: data[key].title || '',
-                    level: data[key].level || '',
-                    price_ref: data[key].price_ref || '',
-                    desc: data[key].desc || '',
-                    suggest: data[key].suggest || ''
-                })
-            }
-        })
-        return results.length > 0 ? results : []
+        // 兼容单对象返回
+        return {
+            dynasty: data.dynasty || selectedDynasty.value,
+            title: data.title || '',
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            level: data.level || '',
+            price_ref: data.price_ref || '',
+            desc: data.desc || '',
+            suggest: data.suggest || ''
+        }
     } catch (e) {
         console.error('JSON 解析失败:', e)
-        return []
+        return null
     }
 }
 
@@ -101,41 +90,46 @@ const askAI = async () => {
     const messages: ChatMessage[] = [
         {
             role: 'system',
-            content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两），同时分析其在 汉、唐、宋、明、清 五个朝代对应的社会地位。
+            content: `你是一位通晓古今社会经济的史官。请根据用户提供的月薪折合白银数量（两），分析其在指定朝代的社会地位。
 请注意：不同朝代银两价值和度量衡标准差异极大。
-请结合各朝代真实的购买力给出职业和生活分析，并务必提供该朝代的【物价参考】。
+
+【核心要求】
+1. 目标朝代：${selectedDynasty.value}朝。
+2. 职业细化：给出具体的、有该朝代特征的身份（不要笼统，如“手工业者”）。
+3. 细分标签：为该身份提供3-4个细分标签（tags）。
+4. 真实物价：结合该朝代真实的购买力给出职业和生活分析，并务必提供具体的【物价参考】。
 
 请直接返回 JSON 格式数据，不要有任何开场白或解释。
 JSON 结构如下：
 {
-  "汉": { "dynasty": "大汉西汉年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
-  "唐": { "dynasty": "大唐贞观年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
-  "宋": { "dynasty": "大宋开宝年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
-  "明": { "dynasty": "大明万历年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" },
-  "清": { "dynasty": "大清康熙年间", "title": "职业", "level": "生活水平", "price_ref": "物价参考", "desc": "描述", "suggest": "锦囊" }
+  "dynasty": "${selectedDynasty.value}朝", 
+  "title": "具体的职业身份", 
+  "tags": ["标签1", "标签2", "标签3"],
+  "level": "生活水平", 
+  "price_ref": "具体物价参考(如一石米多少钱)", 
+  "desc": "基于该职业的社会地位描述", 
+  "suggest": "生存锦囊" 
 }`
         },
         {
             role: 'user',
             content: `余月俸 ${salary.value} 文。
-按历代度量衡折算：
-- 汉代：${calculateDynastyTaels('汉')} 两
-- 唐代：${calculateDynastyTaels('唐')} 两
-- 宋代：${calculateDynastyTaels('宋')} 两
-- 明清：${calculateDynastyTaels('明')} 两
+按${selectedDynasty.value}代度量衡折算约为：${calculateDynastyTaels(selectedDynasty.value)} 两。
 请据此批阅。`
         }
     ]
 
     try {
         const content = await zhipuApi.chat(messages)
-        aiResults.value = parseAIResponse(content)
+        const result = parseAIResponse(content)
+        if (result) aiResults.value = [result]
     } catch (error) {
         console.error('AI 接口调用失败', error)
         aiResults.value = [
             {
                 dynasty: '时空缝隙',
                 title: '时空浪人',
+                tags: ['网络错误', '维度漂移'],
                 level: '身无分文',
                 price_ref: '详见史料',
                 desc: '由于时空波动（网络错误），你暂时流落在古代街头。',
@@ -151,702 +145,617 @@ onMounted(() => {})
 </script>
 
 <template>
-    <div class="app-wrapper">
-        <!-- 顶部状态栏 -->
-        <div class="top-nav">
+    <div class="app-container">
+        <!-- 顶部导航栏 -->
+        <header class="navbar">
             <div class="nav-left">
-                <div class="status-indicator"><span class="dot"></span> 乾坤待定</div>
-                <div class="path">~/ 银色春秋 <span class="cursor">|</span></div>
+                <span class="nav-brand">银色春秋.AI</span>
             </div>
             <div class="nav-right">
-                <div class="nav-item">考功</div>
-                <div class="nav-item">方志</div>
-                <div class="nav-item login-btn">登入</div>
+                <button class="btn-primary">立即开始</button>
             </div>
-        </div>
+        </header>
 
         <main class="main-content">
-            <!-- 页面标题 -->
-            <header class="page-header">
-                <div class="file-name">卷一 · 薪俸考</div>
-                <div class="comment-line">/* 凡月薪几何，换算纹银，以观前程 */</div>
-                <div class="title-group">
-                    <div class="seal-icon">银</div>
-                    <div class="text-wrap">
-                        <h1>银色春秋</h1>
-                        <h2 class="sub-title">SilverEra</h2>
+            <!-- 页面标题区域 -->
+            <section class="hero-section">
+                <div class="breadcrumb">
+                    <span class="dot"></span>
+                    <span>工资银两换算器 / 银色春秋</span>
+                </div>
+                <h1 class="hero-title"><span class="accent-arrow">→</span> 穿越千年的<span class="highlight">购买力</span>对标</h1>
+                <p class="hero-desc">// 通过现代工资与历代银价权重，精准还原你在古代的社会阶层</p>
+            </section>
+
+            <!-- 输入区域容器 -->
+            <div class="window-container input-window">
+                <div class="window-header">
+                    <div class="window-controls">
+                        <span class="control close"></span>
+                        <span class="control minimize"></span>
+                        <span class="control maximize"></span>
+                    </div>
+                    <div class="window-title">参数输入 / 配置</div>
+                </div>
+                <div class="window-body">
+                    <div class="input-grid">
+                        <div class="input-group">
+                            <label>月薪收入 (CNY)</label>
+                            <div class="input-wrapper">
+                                <input type="number" v-model="salary" placeholder="请输入您的月薪..." />
+                                <span class="unit">¥</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>今日银价 (CNY/克)</label>
+                            <div class="input-wrapper">
+                                <input type="number" v-model="silverPrice" placeholder="当前市场金价..." />
+                                <span class="unit">¥/g</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="intro-line">昔者，银钱之动，牵乎国计民生。 今以算法拟古之物价，助尔窥见若置身盛世，当为何等身份。</div>
-            </header>
+            </div>
 
-            <!-- 核心卷轴容器 -->
-            <div class="scroll-container">
-                <div class="scroll-handle top"></div>
-                <div class="scroll-paper">
-                    <!-- 银价状态 -->
-                    <div class="silver-info">
-                        <span class="label">当前银价:</span>
-                        <div class="manual-input-box">
-                            <input v-model="silverPrice" type="number" placeholder="请输入今日银价" class="manual-silver-input" />
-                        </div>
-                        <span class="unit">元/克</span>
+            <!-- 换算结果区域 -->
+            <div class="window-container results-window">
+                <div class="window-header">
+                    <div class="window-controls">
+                        <span class="control close"></span>
+                        <span class="control minimize"></span>
+                        <span class="control maximize"></span>
                     </div>
-
-                    <div class="input-section">
-                        <div class="input-row">
-                            <span>吾之月俸：</span>
-                            <div class="input-box">
-                                <input v-model="salary" type="number" placeholder="请输入月薪" @keyup.enter="askAI" />
-                                <span class="unit">元</span>
-                            </div>
-                        </div>
-                        <div class="action-row">
-                            <button class="ancient-btn" :disabled="!salary || !silverPrice || loadingAI" @click="askAI">
-                                <span v-if="!loadingAI">咨询主簿</span>
-                                <span v-else>主簿批阅中...</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- 结果展示 -->
-                    <transition name="scroll-unfold">
-                        <div v-if="salary && silverPrice" class="result-display">
-                            <div class="divider"></div>
-
-                            <div class="tael-result">
-                                <p class="label">—— 历代俸银换算 ——</p>
-                                <div class="dynasty-taels-list">
-                                    <div v-for="(weight, dynasty) in dynastyStandards" :key="dynasty" class="dynasty-tael-item">
-                                        <span class="dynasty-name">{{ dynasty }}代：</span>
-                                        <span class="dynasty-value">{{ calculateDynastyTaels(dynasty) }}</span>
-                                        <span class="dynasty-unit">两</span>
-                                    </div>
-                                    <div class="dynasty-tael-item modern">
-                                        <span class="dynasty-name">现代(50g)：</span>
-                                        <span class="dynasty-value">{{ taels }}</span>
-                                        <span class="dynasty-unit">两</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- AI 分析 -->
-                            <div v-if="aiResults.length > 0 || loadingAI" class="ai-scroll-content">
-                                <div v-if="loadingAI" class="ai-loading">
-                                    <div class="loading-spinner"></div>
-                                    <p>主簿正翻阅《历代职官志》...</p>
-                                </div>
-
-                                <div v-else class="results-grid">
-                                    <div v-for="(item, index) in aiResults" :key="index" class="analysis-paper">
-                                        <div class="analysis-header">
-                                            <h3>《{{ item.dynasty }} · 前程简批》</h3>
-                                        </div>
-                                        <div class="analysis-body">
-                                            <div class="info-grid">
-                                                <div class="info-item">
-                                                    <span class="key">折合银两：</span>
-                                                    <span class="val highlight">{{ calculateDynastyTaels(item.dynasty) }} 两</span>
-                                                </div>
-                                                <div class="info-item">
-                                                    <span class="key">所获身份：</span>
-                                                    <span class="val">{{ item.title }}</span>
-                                                </div>
-                                                <div class="info-item">
-                                                    <span class="key">生活水平：</span>
-                                                    <span class="val">{{ item.level }}</span>
-                                                </div>
-                                                <div class="info-item full-width">
-                                                    <span class="key">当年物价：</span>
-                                                    <span class="val price-text">{{ item.price_ref }}</span>
-                                                </div>
-                                            </div>
-                                            <div class="desc-box">
-                                                <p>{{ item.desc }}</p>
-                                            </div>
-                                            <div class="suggest-box">
-                                                <span class="key">【生存锦囊】</span>
-                                                <p>{{ item.suggest }}</p>
-                                            </div>
-                                        </div>
-                                        <div class="seal-bottom">准</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </transition>
+                    <div class="window-title">换算结果 / 结果</div>
                 </div>
-                <div class="scroll-handle bottom"></div>
+                <div class="window-body">
+                    <div class="selection-hint">// 请点击选择一个朝代进行 AI 深度分析</div>
+                    <div class="dynasty-grid">
+                        <div
+                            v-for="(weight, dynasty) in dynastyStandards"
+                            :key="dynasty"
+                            class="dynasty-card"
+                            :class="{ active: selectedDynasty === dynasty }"
+                            @click="selectedDynasty = dynasty"
+                        >
+                            <div class="card-header">
+                                <span class="dynasty-tag">{{ dynasty }}朝</span>
+                                <span class="weight-info">{{ weight }}g/两</span>
+                            </div>
+                            <div class="card-value">
+                                <span class="amount">{{ calculateDynastyTaels(dynasty) }}</span>
+                                <span class="currency">两</span>
+                            </div>
+                            <div class="card-footer">月俸对标</div>
+                            <div class="select-indicator" v-if="selectedDynasty === dynasty">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ai-action">
+                        <button @click="askAI" :disabled="loadingAI || !salary" class="btn-ai">
+                            <span v-if="loadingAI" class="loader"></span>
+                            {{ loadingAI ? '分析中...' : `对标 ${selectedDynasty} 朝身份` }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI 分析展示区 -->
+            <div v-if="aiResults.length > 0" class="window-container ai-window">
+                <div class="window-header">
+                    <div class="window-controls">
+                        <span class="control close"></span>
+                        <span class="control minimize"></span>
+                        <span class="control maximize"></span>
+                    </div>
+                    <div class="window-title">AI 阶层透视 / 分析</div>
+                </div>
+                <div class="window-body ai-content">
+                    <div v-for="(item, index) in aiResults" :key="index" class="ai-item">
+                        <div class="ai-dynasty-header">
+                            <span class="ai-tag-dynasty"># {{ item.dynasty }}</span>
+                            <span class="ai-level">{{ item.level }}</span>
+                        </div>
+                        <h3 class="ai-title">{{ item.title }}</h3>
+                        <!-- 细分职业标签 -->
+                        <div class="ai-job-tags">
+                            <span v-for="tag in item.tags" :key="tag" class="job-tag">{{ tag }}</span>
+                        </div>
+                        <p class="ai-desc">{{ item.desc }}</p>
+                        <div class="ai-price-ref">
+                            <span class="price-label">当年物价参考：</span>
+                            {{ item.price_ref }}
+                        </div>
+                        <div class="ai-suggest">
+                            <span class="suggest-label">建议：</span>
+                            {{ item.suggest }}
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
 
-        <footer class="page-footer">
-            <div class="footer-logo">🥈 银色春秋 · 庚子年制</div>
-            <div class="footer-info">基于 GLM-4-FLASH 灵感演化 · 纯属趣味模拟</div>
+        <footer class="app-footer">
+            <p>© 2026 银色春秋项目. All rights reserved.</p>
         </footer>
     </div>
 </template>
 
 <style scoped>
-.app-wrapper {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px 40px;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+/* 全局变量与背景 */
+:global(body) {
+    background-color: #0a0a0a;
+    background-image: linear-gradient(rgba(255, 107, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 107, 0, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+    margin: 0;
+    font-family:
+        'Inter',
+        -apple-system,
+        BlinkMacSystemFont,
+        'PingFang SC',
+        'Microsoft YaHei',
+        sans-serif;
+    color: #e0e0e0;
 }
 
-/* 顶部状态栏 - 古风化 */
-.top-nav {
+.app-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* 导航栏 */
+.navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 0;
-    font-size: 13px;
-    color: #5d5d5d;
-    margin-bottom: 40px;
-    border-bottom: 1px double #ccc;
+    padding: 24px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.nav-left {
-    display: flex;
-    gap: 20px;
-    align-items: center;
+.nav-brand {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #ff6b00;
+    margin-right: 40px;
 }
 
-.nav-right {
-    display: flex;
-    gap: 15px;
-    align-items: center;
+.nav-links {
+    display: inline-flex;
+    gap: 24px;
 }
 
-.nav-item {
-    padding: 4px 12px;
-    border: 1px solid #dcdcdc;
-    background: rgba(255, 255, 255, 0.5);
-    color: #444;
+.nav-link {
+    color: #999;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: color 0.3s;
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: #fff;
+}
+
+.btn-primary {
+    background: #ff6b00;
+    color: #fff;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s;
+    transition:
+        transform 0.2s,
+        background 0.2s;
 }
 
-.nav-item:hover {
-    background: #eee;
-    border-color: #999;
+.btn-primary:hover {
+    background: #ff8533;
+    transform: translateY(-1px);
 }
 
-.login-btn {
-    background: #9b2226; /* 朱砂红 */
-    color: #f4f1de;
-    border-color: #9b2226;
+/* Hero 区域 */
+.hero-section {
+    padding: 60px 0 40px;
 }
 
-.status-indicator {
+.breadcrumb {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #ff6b00;
+    margin-bottom: 16px;
 }
 
-.status-indicator .dot {
+.dot {
     width: 6px;
     height: 6px;
-    background-color: #9b2226;
+    background: #ff6b00;
     border-radius: 50%;
-    box-shadow: 0 0 5px rgba(155, 34, 38, 0.5);
 }
 
-.path .cursor {
-    color: #9b2226;
-    animation: blink 1s infinite;
+.hero-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 0 0 16px;
+    color: #fff;
 }
 
-@keyframes blink {
-    50% {
-        opacity: 0;
-    }
+.accent-arrow {
+    color: #ff6b00;
+    margin-right: 8px;
 }
 
-/* 页面标题区 */
-.page-header {
-    margin-bottom: 50px;
-    text-align: center;
+.highlight {
+    color: #ff6b00;
 }
 
-.file-name {
-    font-size: 14px;
-    color: #888;
-    margin-bottom: 8px;
-    letter-spacing: 0.2em;
+.hero-desc {
+    color: #666;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.95rem;
 }
 
-.comment-line {
-    font-size: 14px;
-    color: #aaa;
+/* 窗口容器风格 */
+.window-container {
+    background: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
     margin-bottom: 30px;
-    font-style: italic;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
-.title-group {
+.window-header {
+    background: #1a1a1a;
+    padding: 12px 16px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.window-controls {
+    display: flex;
+    gap: 8px;
+    margin-right: 16px;
+}
+
+.control {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.close {
+    background: #ff5f56;
+}
+.minimize {
+    background: #ffbd2e;
+}
+.maximize {
+    background: #27c93f;
+}
+
+.window-title {
+    font-size: 0.75rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.window-body {
+    padding: 24px;
+}
+
+/* 输入区域网格 */
+.input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.input-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: #999;
+    margin-bottom: 8px;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-wrapper input {
+    width: 100%;
+    background: #1f1f1f;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 12px 16px;
+    color: #fff;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.input-wrapper input:focus {
+    outline: none;
+    border-color: #ff6b00;
+}
+
+.unit {
+    position: absolute;
+    right: 16px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+/* 结果网格 */
+.dynasty-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
     margin-bottom: 24px;
 }
 
-.seal-icon {
-    width: 50px;
-    height: 50px;
-    border: 3px solid #9b2226;
-    color: #9b2226;
-    font-size: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Ma Shan Zheng', serif;
-    font-weight: bold;
-    padding: 5px;
-    transform: rotate(-5deg);
-    box-shadow: 2px 2px 0 rgba(155, 34, 38, 0.2);
-}
-
-.text-wrap h1 {
-    font-size: 42px;
-    margin: 0;
-    font-weight: bold;
-    color: #1a1a1a;
-    font-family: 'Ma Shan Zheng', serif;
-}
-
-.sub-title {
-    font-size: 18px;
-    margin: 0;
-    color: #999;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-}
-
-.intro-line {
-    font-size: 16px;
-    color: #555;
-    line-height: 1.8;
-    max-width: 500px;
-    margin: 0 auto;
-    font-family: 'Kaiti', serif;
-}
-
-/* 卷轴容器 */
-.scroll-container {
-    position: relative;
-    margin-bottom: 60px;
-}
-
-.scroll-handle {
-    height: 25px;
-    background: linear-gradient(to right, #4a4a4a, #2a2a2a, #4a4a4a);
-    border-radius: 12px;
-    position: relative;
-    z-index: 2;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
-
-.scroll-handle::before,
-.scroll-handle::after {
-    content: '';
-    position: absolute;
-    top: -5px;
-    width: 35px;
-    height: 35px;
-    background: #8b5e34;
-    border-radius: 50%;
-    border: 3px solid #5d4037;
-}
-
-.scroll-handle::before {
-    left: -10px;
-}
-.scroll-handle::after {
-    right: -10px;
-}
-
-.scroll-paper {
-    background: #fdfaf0;
-    border-left: 2px solid #e2d1b3;
-    border-right: 2px solid #e2d1b3;
-    padding: 40px 20px; /* 减少左右内边距，给网格更多空间 */
-    min-height: 200px;
-    position: relative;
-    z-index: 1;
-    box-shadow: inset 0 0 50px rgba(226, 209, 179, 0.3);
-}
-
-/* 银价信息 */
-.silver-info {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    font-size: 14px;
-    color: #777;
-    margin-bottom: 40px;
-    font-family: 'Kaiti', serif;
-    gap: 10px;
-}
-
-.manual-input-box {
-    border-bottom: 1px solid #9b2226;
-}
-
-.manual-silver-input {
-    background: transparent;
-    border: none;
-    width: 100px;
-    text-align: center;
-    font-size: 16px;
-    color: #9b2226;
-    outline: none;
-    font-family: 'Kaiti', serif;
-}
-
-.manual-silver-input::-webkit-outer-spin-button,
-.manual-silver-input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-.silver-info .value {
-    color: #1a1a1a;
-    font-weight: bold;
-}
-
-/* 输入区域 */
-.input-section {
-    margin-bottom: 40px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 30px;
-}
-
-.input-row {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    font-size: 20px;
-    font-family: 'Kaiti', serif;
-}
-
-.input-box {
-    border-bottom: 2px solid #9b2226;
-    padding-bottom: 5px;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-}
-
-.input-box input {
-    background: transparent;
-    border: none;
-    font-size: 24px;
-    width: 180px;
-    text-align: center;
-    color: #1a1a1a;
-    outline: none;
-    font-family: 'Kaiti', serif;
-}
-
-/* 隐藏数字输入框调节钮 */
-.input-box input::-webkit-outer-spin-button,
-.input-box input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-.input-box input[type='number'] {
-    -moz-appearance: textfield;
-}
-
-.input-box input::placeholder {
-    color: #bbb;
-    font-size: 18px;
-}
-
-.ancient-btn {
-    padding: 15px 50px;
-    background: #9b2226; /* 改为朱砂红，更显眼 */
-    color: #fdfaf0;
-    font-size: 20px;
-    font-family: 'Ma Shan Zheng', 'Kaiti', serif;
-    letter-spacing: 0.3em;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 4px 4px 0 #1a1a1a;
-    border-radius: 4px;
-}
-
-.ancient-btn:hover:not(:disabled) {
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 #1a1a1a;
-    background: #b91d1d;
-}
-
-.ancient-btn:disabled {
-    background: #d0d0d0;
-    color: #888;
-    box-shadow: 4px 4px 0 #bbb;
-    cursor: not-allowed;
-}
-
-/* 结果展示 */
-.result-display {
-    margin-top: 40px;
-}
-
-.results-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr); /* 默认两列 */
-    gap: 30px;
-    margin-top: 20px;
-}
-
-@media (max-width: 900px) {
-    .results-grid {
-        grid-template-columns: 1fr; /* 移动端单列 */
-    }
-}
-
-@media (max-width: 600px) {
-    .app-wrapper {
-        padding: 10px;
-    }
-    .scroll-paper {
-        padding: 30px 15px;
-    }
-}
-
-.divider {
-    height: 2px;
-    background: linear-gradient(to right, transparent, #e2d1b3, transparent);
-    margin: 30px 0;
-}
-
-.tael-result {
-    text-align: center;
-    margin-bottom: 40px;
-    padding: 20px;
-    background: rgba(155, 34, 38, 0.03);
+.dynasty-card {
+    background: #1f1f1f;
+    border: 1px solid #333;
     border-radius: 8px;
-}
-
-.tael-result .label {
-    color: #888;
-    font-family: 'Kaiti', serif;
-    margin-bottom: 15px;
-}
-
-.dynasty-taels-list {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 20px;
-}
-
-.dynasty-tael-item {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    padding: 10px 20px;
-    background: #fff;
-    border: 1px solid #e2d1b3;
-    border-radius: 4px;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.03);
-}
-
-.dynasty-tael-item.modern {
-    border-color: #9b2226;
-    background: #fdf2f2;
-}
-
-.dynasty-name {
-    font-size: 15px;
-    color: #666;
-    font-family: 'Kaiti', serif;
-}
-
-.dynasty-value {
-    font-size: 28px;
-    font-weight: bold;
-    color: #1a1a1a;
-    font-family: 'Ma Shan Zheng', serif;
-}
-
-.dynasty-unit {
-    font-size: 16px;
-    color: #888;
-}
-
-/* AI 结果纸张 */
-.analysis-paper {
-    background: #fff;
-    padding: 30px;
-    border: 1px solid #eee;
-    box-shadow: 2px 2px 15px rgba(0, 0, 0, 0.05);
+    padding: 16px;
     position: relative;
-    border-top: 5px solid #9b2226;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.analysis-header {
-    text-align: center;
-    margin-bottom: 25px;
-    border-bottom: 1px solid #f0f0f0;
-    padding-bottom: 15px;
+.dynasty-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255, 107, 0, 0.5);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
 }
 
-.analysis-header h3 {
-    margin: 0;
-    color: #1a1a1a;
-    font-family: 'Ma Shan Zheng', serif;
+.dynasty-card.active {
+    border-color: #ff6b00;
+    background: rgba(255, 107, 0, 0.05);
+    box-shadow: 0 0 20px rgba(255, 107, 0, 0.15);
 }
 
-.info-grid {
+.select-indicator {
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    background: #ff6b00;
+    color: #000;
     display: flex;
-    flex-direction: column; /* 改为垂直排列，避免文字拥挤 */
-    gap: 15px;
-    margin-bottom: 25px;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 0 8px 0 8px;
+    animation: fadeIn 0.3s ease;
 }
 
-.info-item .key {
-    color: #888;
-    font-size: 14px;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.info-item .val {
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.info-item .val.highlight {
-    color: #9b2226;
-}
-
-.info-item.full-width {
-    grid-column: span 2;
-    border-top: 1px dashed #eee;
-    padding-top: 10px;
-    margin-top: 5px;
-}
-
-.price-text {
-    font-size: 15px !important;
-    color: #666;
-    font-style: italic;
-}
-
-.desc-box {
-    line-height: 1.8;
+.selection-hint {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
     color: #444;
-    margin-bottom: 25px;
-    font-family: 'Kaiti', serif;
-    padding: 15px;
-    background: #fcfcfc;
-    border-left: 3px solid #ddd;
+    margin-bottom: 20px;
+    padding-left: 4px;
 }
 
-.suggest-box .key {
-    display: block;
-    color: #9b2226;
-    font-weight: bold;
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.dynasty-tag {
+    font-size: 0.75rem;
+    color: #ff6b00;
+    font-weight: 600;
+}
+
+.weight-info {
+    font-size: 0.7rem;
+    color: #666;
+}
+
+.card-value {
     margin-bottom: 8px;
 }
 
-.seal-bottom {
-    position: absolute;
-    bottom: 20px;
-    right: 30px;
-    width: 40px;
-    height: 40px;
-    border: 2px solid #9b2226;
-    color: #9b2226;
+.amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    margin-right: 4px;
+}
+
+.currency {
+    font-size: 0.8rem;
+    color: #999;
+}
+
+.card-footer {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+/* AI 按钮 */
+.ai-action {
+    text-align: center;
+}
+
+.btn-ai {
+    background: #ff6b00;
+    color: #fff;
+    border: none;
+    padding: 14px 40px;
+    border-radius: 30px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 10px 20px rgba(255, 107, 0, 0.2);
+}
+
+.btn-ai:hover:not(:disabled) {
+    background: #ff8533;
+    transform: scale(1.02);
+    box-shadow: 0 12px 24px rgba(255, 107, 0, 0.3);
+}
+
+.btn-ai:disabled {
+    background: #333;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* AI 内容区域 */
+.ai-content {
+    display: grid;
+    gap: 24px;
+}
+
+.ai-item {
+    border-left: 2px solid #ff6b00;
+    padding-left: 20px;
+}
+
+.ai-dynasty-header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-family: 'Ma Shan Zheng', serif;
-    font-weight: bold;
-    transform: rotate(15deg);
-    opacity: 0.6;
+    gap: 12px;
+    margin-bottom: 8px;
 }
 
-.ai-loading {
+.ai-tag-dynasty {
+    color: #ff6b00;
+    font-weight: 700;
+}
+
+.ai-level {
+    font-size: 0.8rem;
+    background: rgba(255, 107, 0, 0.1);
+    color: #ff6b00;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.ai-title {
+    margin: 0 0 12px;
+    font-size: 1.2rem;
+    color: #fff;
+}
+
+.ai-job-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.job-tag {
+    font-size: 0.75rem;
+    background: #1f1f1f;
+    border: 1px solid #333;
+    color: #aaa;
+    padding: 2px 10px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.job-tag:hover {
+    border-color: #ff6b00;
+    color: #ff6b00;
+}
+
+.ai-desc {
+    color: #999;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 16px;
+}
+
+.ai-price-ref {
+    font-size: 0.85rem;
+    color: #888;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    border-left: 2px solid #333;
+}
+
+.price-label {
+    color: #ff6b00;
+    font-weight: 600;
+}
+
+.ai-suggest {
+    font-size: 0.9rem;
+    color: #aaa;
+    font-style: italic;
+}
+
+.suggest-label {
+    color: #ff6b00;
+    font-weight: 600;
+    font-style: normal;
+}
+
+/* 页脚 */
+.app-footer {
     text-align: center;
     padding: 40px 0;
-    color: #888;
+    color: #444;
+    font-size: 0.8rem;
 }
 
-.loading-spinner {
-    width: 30px;
-    height: 30px;
-    border: 2px solid #eee;
-    border-top-color: #9b2226;
+/* 响应式适配 */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 1.8rem;
+    }
+    .input-grid {
+        grid-template-columns: 1fr;
+    }
+    .nav-links {
+        display: none;
+    }
+}
+
+/* 加载动画 */
+.loader {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
-    margin: 0 auto 15px;
-    animation: spin 1s linear infinite;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+    margin-right: 10px;
 }
 
 @keyframes spin {
     to {
         transform: rotate(360deg);
-    }
-}
-
-/* 页脚 */
-.page-footer {
-    margin-top: auto;
-    padding: 60px 0;
-    text-align: center;
-    border-top: 1px double #ccc;
-}
-
-.footer-logo {
-    font-size: 16px;
-    font-weight: bold;
-    font-family: 'Ma Shan Zheng', serif;
-    margin-bottom: 10px;
-}
-
-.footer-info {
-    font-size: 12px;
-    color: #999;
-    font-family: 'Kaiti', serif;
-}
-
-/* 卷轴展开动画 */
-.scroll-unfold-enter-active {
-    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-    max-height: 1000px;
-    overflow: hidden;
-}
-
-.scroll-unfold-enter-from {
-    max-height: 0;
-    opacity: 0;
-}
-
-/* 响应式适配 */
-@media (max-width: 600px) {
-    .app-wrapper {
-        padding: 20px;
-    }
-    .text-wrap h1 {
-        font-size: 32px;
-    }
-    .number-wrap .number {
-        font-size: 54px;
-    }
-    .scroll-paper {
-        padding: 20px;
-    }
-    .info-grid {
-        grid-template-columns: 1fr;
     }
 }
 </style>
