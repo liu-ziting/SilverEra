@@ -53,6 +53,8 @@ interface AIAnalysis {
     price_ref: string
     desc: string
     suggest: string
+    imageUrl?: string
+    loadingImage?: boolean
 }
 
 const aiResults = ref<AIAnalysis[]>([])
@@ -75,7 +77,9 @@ const parseAIResponse = (content: string): AIAnalysis | null => {
             level: data.level || '',
             price_ref: data.price_ref || '',
             desc: data.desc || '',
-            suggest: data.suggest || ''
+            suggest: data.suggest || '',
+            imageUrl: '',
+            loadingImage: false
         }
     } catch (e) {
         console.error('JSON 解析失败:', e)
@@ -129,7 +133,11 @@ JSON 结构必须如下：
     try {
         const content = await aiService.chat(messages)
         const result = parseAIResponse(content)
-        if (result) aiResults.value = [result]
+        if (result) {
+            aiResults.value = [result]
+            // 自动生成古代职业照，传入响应式对象
+            generateAncientPhoto(aiResults.value[0])
+        }
     } catch (error) {
         console.error('AI 接口调用失败', error)
         aiResults.value = [
@@ -145,6 +153,29 @@ JSON 结构必须如下：
         ]
     } finally {
         loadingAI.value = false
+    }
+}
+
+// 生成古代职业照
+const generateAncientPhoto = async (item: AIAnalysis) => {
+    if (!item || item.loadingImage) return
+
+    item.loadingImage = true
+    try {
+        const prompt = `一张${item.dynasty}背景下的古代写实职业照，主角是一位${item.title}。场景细节：${item.desc}。风格：写实，电影质感，细节丰富。`
+        const url = await aiService.generateImage({
+            prompt,
+            size: '1024x1024',
+            quality: 'standard',
+            style: 'vivid'
+        })
+        if (url) {
+            item.imageUrl = url
+        }
+    } catch (error) {
+        console.error('图片生成失败:', error)
+    } finally {
+        item.loadingImage = false
     }
 }
 
@@ -275,18 +306,32 @@ onMounted(() => {})
                 </div>
                 <div class="window-body ai-content">
                     <div v-for="(item, index) in aiResults" :key="index" class="ai-item">
-                        <div class="ai-dynasty-header">
-                            <span class="ai-tag-dynasty"># {{ item.dynasty }}</span>
-                            <span class="ai-level">{{ item.level }}</span>
+                        <div class="ai-header-row">
+                            <div class="ai-main-info">
+                                <div class="ai-dynasty-header">
+                                    <span class="ai-tag-dynasty"># {{ item.dynasty }}</span>
+                                    <span class="ai-level">{{ item.level }}</span>
+                                </div>
+                                <div class="ai-taels">
+                                    折算：月入 {{ calculateDynastyTaels(item.dynasty) }} 两<span v-if="showAnnual"> · 年入 {{ calculateDynastyTaels(item.dynasty, true) }} 两</span>
+                                </div>
+                                <h3 class="ai-title">{{ item.title }}</h3>
+                                <!-- 细分职业标签 -->
+                                <div class="ai-job-tags">
+                                    <span v-for="tag in item.tags" :key="tag" class="job-tag">{{ tag }}</span>
+                                </div>
+                            </div>
+
+                            <!-- 职业照头像 -->
+                            <div v-if="item.loadingImage || item.imageUrl" class="ai-avatar-wrapper">
+                                <div v-if="item.loadingImage" class="avatar-loader">
+                                    <span class="loader"></span>
+                                    <span class="loader-text">画像中...</span>
+                                </div>
+                                <img v-else :src="item.imageUrl" alt="职业照" class="ai-avatar" />
+                            </div>
                         </div>
-                        <div class="ai-taels">
-                            折算：月入 {{ calculateDynastyTaels(item.dynasty) }} 两<span v-if="showAnnual"> · 年入 {{ calculateDynastyTaels(item.dynasty, true) }} 两</span>
-                        </div>
-                        <h3 class="ai-title">{{ item.title }}</h3>
-                        <!-- 细分职业标签 -->
-                        <div class="ai-job-tags">
-                            <span v-for="tag in item.tags" :key="tag" class="job-tag">{{ tag }}</span>
-                        </div>
+
                         <p class="ai-desc">{{ item.desc }}</p>
                         <div class="ai-price-ref">
                             <span class="price-label">当年物价参考：</span>
@@ -776,8 +821,90 @@ onMounted(() => {})
 }
 
 .ai-item {
-    border-left: 2px solid #e67e22;
-    padding-left: 20px;
+    padding: 24px;
+    border-bottom: 1px solid #f0f0f0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ai-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.ai-main-info {
+    flex: 1;
+}
+
+.ai-avatar-wrapper {
+    flex-shrink: 0;
+    width: 100px;
+    height: 100px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f8f9fa;
+    border: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.ai-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.avatar-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.loader-text {
+    font-size: 0.7rem;
+    color: #95a5a6;
+}
+
+.ai-desc {
+    color: #34495e;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 4px 0;
+}
+
+.ai-price-ref {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    background: #fcfcfc;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 2px solid #eee;
+}
+
+.ai-suggest {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .ai-dynasty-header {
