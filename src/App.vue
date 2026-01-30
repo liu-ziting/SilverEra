@@ -451,7 +451,7 @@ onMounted(() => {})
 
 /* Hero 区域 */
 .hero-section {
-    padding: 60px 0 40px;
+    padding: 30px 0 40px;
 }
 
 .breadcrumb {
@@ -857,14 +857,55 @@ onMounted(() => {})
 
 /* 响应式适配 */
 @media (max-width: 768px) {
-    .hero-title {
-        font-size: 1.8rem;
+    .navbar {
+        padding: 16px 0;
+        gap: 12px;
     }
+
+    .nav-brand {
+        font-size: 1.1rem;
+        white-space: nowrap;
+    }
+
+    .model-credit {
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        flex-shrink: 1;
+        min-width: 0;
+    }
+
+    .model-credit span:not(.model-name):not(.pulse-dot) {
+        display: none; /* 在极小屏幕隐藏“由大模型...驱动”字样 */
+    }
+
+    .hero-section {
+        padding: 30px 0 20px;
+    }
+
+    .hero-title {
+        font-size: 1.6rem;
+        line-height: 1.3;
+    }
+
     .input-grid {
         grid-template-columns: 1fr;
     }
-    .nav-links {
-        display: none;
+}
+
+@media (max-width: 480px) {
+    .navbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .nav-right {
+        width: 100%;
+    }
+
+    .model-credit {
+        width: 100%;
+        justify-content: center;
     }
 }
 
