@@ -222,7 +222,7 @@ onMounted(() => {})
                 </div>
                 <div class="window-body">
                     <div class="selection-bar">
-                        <div class="selection-hint">// 请点击选择一个朝代进行 AI 深度分析（默认以月入为主）</div>
+                        <div class="selection-hint">// 请点击选择一个朝代进行 AI 深度分析</div>
                         <label class="annual-toggle">
                             <input type="checkbox" v-model="showAnnual" />
                             年入参考
