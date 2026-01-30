@@ -53,6 +53,12 @@ interface AIAnalysis {
     price_ref: string
     desc: string
     suggest: string
+    insight: string // 新增：跨时空扎心点评
+    purchasing_power: {
+        trend: 'up' | 'down' | 'stable'
+        label: string
+        desc: string
+    } // 新增：消费力预警
     imageUrl?: string
     loadingImage?: boolean
 }
@@ -88,6 +94,8 @@ const parseAIResponse = (content: string): AIAnalysis | null => {
             price_ref: data.price_ref || '',
             desc: data.desc || '',
             suggest: data.suggest || '',
+            insight: data.insight || '',
+            purchasing_power: data.purchasing_power || { trend: 'stable', label: '持平', desc: '' },
             imageUrl: '',
             loadingImage: false
         }
@@ -117,26 +125,32 @@ const askAI = async () => {
 2. 目标朝代：${selectedDynasty.value}朝。请严格以此朝代为基础进行分析。
 3. 职业多样化匹配：根据收入水平，从“士农工商”及其他社会阶层（如军户、匠籍等）中匹配最贴切的身份。
 4. 真实物价分析：结合该朝代真实的购买力，提供职业和生活分析。务必提供具体的【物价参考】，如一石米、一匹布的价格（以白银两为单位）。
+5. 跨时空“扎心”点评：请对比该古代职业与现代生活，给出一个犀利、幽默或引人深思的点评（insight）。例如对比房价、物价自由度、社会地位等。
+6. 消费力“降级/升级”预警：分析从现代到该古代职业，整体生活质量和购买力是上升还是下降了。
+   - trend: "up" (升级), "down" (降级), "stable" (持平)
+   - label: 简短的标题（如：肉食自由丧失、房产阶级跃升）
+   - desc: 具体的购买力变化描述。
 
-你的响应必须直接返回JSON格式数据，不要有任何开场白、解释或额外文本。
-JSON 结构必须如下：
+请以 JSON 格式输出，包含以下字段：
 {
   "dynasty": "${selectedDynasty.value}朝",
-  "title": "具体的职业身份（需有朝代特征）",
-  "tags": ["标签1", "标签2", "标签3"],
-  "level": "生活水平描述（如'赤贫'、'温饱'、'小康'、'富裕'、'豪奢'）",
-  "price_ref": "具体物价参考（例如'一石米约值白银0.5两，据《梦溪笔谈》记载'）",
-  "desc": "基于该职业的社会地位、月收入与物价的分析描述（请明确提到月收入在当时的水平；若涉及年俸请换算为月均并说明）",
-  "suggest": "生存锦囊"
-}`
+  "title": "匹配的职业身份",
+  "tags": ["标签1", "标签2"],
+  "level": "社会阶层（如：平民、士绅、权贵等）",
+  "price_ref": "具体物价参考描述",
+  "desc": "详细的职业生活和社会地位分析",
+  "suggest": "生存锦囊建议",
+  "insight": "跨时空扎心点评",
+  "purchasing_power": {
+    "trend": "up/down/stable",
+    "label": "标题",
+    "desc": "详细描述"
+  }
+} `
         },
         {
             role: 'user',
-            content: `余月俸 ${salary.value} 元（现代货币）。
-按${selectedDynasty.value}代度量衡折算：
-- 月入约：${monthlyTaels} 两
-- 年入约：${annualTaels} 两
-请以月入为主批阅（年入仅作参考）。`
+            content: `我的月薪是 ${salary.value} 元，当前银价是 ${silverPrice.value} 元/克。在 ${selectedDynasty.value} 朝，这相当于月入 ${monthlyTaels} 两白银，年入 ${annualTaels} 两。请开始你的分析。`
         }
     ]
 
@@ -364,6 +378,34 @@ onMounted(() => {})
                             <div class="ai-info-card suggest-card">
                                 <div class="card-title"><span class="icon">💡</span> 生存锦囊</div>
                                 <div class="card-content">{{ item.suggest }}</div>
+                            </div>
+                        </div>
+
+                        <!-- 消费力预警 -->
+                        <div v-if="item.purchasing_power && item.purchasing_power.desc" class="ai-purchasing-power" :class="'trend-' + item.purchasing_power.trend">
+                            <div class="power-header">
+                                <div class="power-trend-icon">
+                                    <span v-if="item.purchasing_power.trend === 'up'">📈</span>
+                                    <span v-else-if="item.purchasing_power.trend === 'down'">📉</span>
+                                    <span v-else>📊</span>
+                                </div>
+                                <div class="power-title">
+                                    <span class="power-label"
+                                        >消费力{{ item.purchasing_power.trend === 'up' ? '升级' : item.purchasing_power.trend === 'down' ? '降级' : '持平' }}</span
+                                    >
+                                    <h4 class="power-sub-label">{{ item.purchasing_power.label }}</h4>
+                                </div>
+                            </div>
+                            <p class="power-desc">{{ item.purchasing_power.desc }}</p>
+                        </div>
+
+                        <!-- 跨时空扎心点评 -->
+                        <div v-if="item.insight" class="ai-insight-box">
+                            <div class="insight-label">穿越者感言</div>
+                            <div class="insight-content">
+                                <span class="quote-icon start">“</span>
+                                {{ item.insight }}
+                                <span class="quote-icon end">”</span>
                             </div>
                         </div>
                     </div>
@@ -1068,12 +1110,153 @@ onMounted(() => {})
     line-height: 1.6;
 }
 
+/* 消费力预警样式 */
+.ai-purchasing-power {
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 8px;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.ai-purchasing-power.trend-up {
+    background: rgba(39, 201, 63, 0.05);
+    border-color: rgba(39, 201, 63, 0.2);
+}
+
+.ai-purchasing-power.trend-down {
+    background: rgba(255, 95, 86, 0.05);
+    border-color: rgba(255, 95, 86, 0.2);
+}
+
+.ai-purchasing-power.trend-stable {
+    background: rgba(149, 165, 166, 0.05);
+    border-color: rgba(149, 165, 166, 0.2);
+}
+
+.power-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.power-trend-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.power-title {
+    display: flex;
+    flex-direction: column;
+}
+
+.power-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.trend-up .power-label {
+    color: #27c93f;
+}
+.trend-down .power-label {
+    color: #ff5f56;
+}
+.trend-stable .power-label {
+    color: #95a5a6;
+}
+
+.power-sub-label {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #2c3e50;
+}
+
+.power-desc {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #5d6d7e;
+    line-height: 1.6;
+}
+
 .suggest-card {
     background: rgba(39, 201, 63, 0.02);
 }
 
 .suggest-card .card-title {
     color: #27c93f;
+}
+
+/* 扎心点评样式 */
+.ai-insight-box {
+    margin-top: 8px;
+    background: linear-gradient(135deg, #fffaf3 0%, #fff5e6 100%);
+    border: 1px dashed #e67e22;
+    border-radius: 12px;
+    padding: 16px 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.ai-insight-box::before {
+    content: 'INSIGHT';
+    position: absolute;
+    right: -10px;
+    top: -5px;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: rgba(230, 126, 34, 0.04);
+    font-style: italic;
+    pointer-events: none;
+}
+
+.insight-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #e67e22;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.insight-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(230, 126, 34, 0.1);
+}
+
+.insight-content {
+    font-size: 0.95rem;
+    color: #6d4c41;
+    line-height: 1.6;
+    font-style: italic;
+    position: relative;
+    padding: 0 10px;
+}
+
+.quote-icon {
+    color: rgba(230, 126, 34, 0.2);
+    font-family: 'Georgia', serif;
+    font-size: 2rem;
+    line-height: 1;
+    position: absolute;
+}
+
+.quote-icon.start {
+    top: -10px;
+    left: -15px;
+}
+
+.quote-icon.end {
+    bottom: -25px;
+    right: -5px;
 }
 
 /* 图片查看弹窗样式 */
