@@ -66,7 +66,7 @@ const showAnnual = ref(false)
 const showImageModal = ref(false)
 const modalImageUrl = ref('')
 
-const viewLargeImage = (url: string) => {
+const viewLargeImage = (url: string | undefined) => {
     if (!url) return
     modalImageUrl.value = url
     showImageModal.value = true
