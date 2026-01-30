@@ -172,7 +172,9 @@ const askAI = async () => {
                 level: '身无分文',
                 price_ref: '详见史料',
                 desc: '由于时空波动（网络错误），你暂时流落在古代街头。',
-                suggest: '建议原地等待，或者检查一下你的网络连接。'
+                suggest: '建议原地等待，或者检查一下你的网络连接。',
+                insight: '断网了，这就是最扎心的点评。',
+                purchasing_power: { trend: 'down', label: '信号降级', desc: '你的现代通讯工具已失效。' }
             }
         ]
     } finally {
